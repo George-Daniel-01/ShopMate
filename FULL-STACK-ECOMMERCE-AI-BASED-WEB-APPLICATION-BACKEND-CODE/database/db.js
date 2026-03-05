@@ -2,14 +2,16 @@
 import dotenv from "dotenv";
 dotenv.config({ path: "./config/config.env" });
 const { Client } = pkg;
+
 export const database = new Client({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
   port: Number(process.env.DB_PORT),
-  ssl: { rejectUnauthorized: false },
+  ssl: false,
 });
+
 export const connectDB = async () => {
   try {
     await database.connect();
