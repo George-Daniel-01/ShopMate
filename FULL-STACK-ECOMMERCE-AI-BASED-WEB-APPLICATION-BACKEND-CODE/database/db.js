@@ -1,18 +1,15 @@
-import pkg from "pg";
+﻿import pkg from "pg";
 import dotenv from "dotenv";
-
 dotenv.config({ path: "./config/config.env" });
-
 const { Client } = pkg;
-
 export const database = new Client({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
   port: Number(process.env.DB_PORT),
+  ssl: { rejectUnauthorized: false },
 });
-
 export const connectDB = async () => {
   try {
     await database.connect();
@@ -22,6 +19,3 @@ export const connectDB = async () => {
     process.exit(1);
   }
 };
-
-
-
