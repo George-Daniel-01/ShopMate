@@ -79,11 +79,10 @@ app.post(
 
 app.use(cookieParser());
 
-// IMPORTANT: fileUpload MUST come BEFORE express.json() and express.urlencoded()
+// ✅ FIXED: useTempFiles set to false so it works on Vercel (read-only filesystem)
 app.use(
   fileUpload({
-    tempFileDir: "./uploads",
-    useTempFiles: true,
+    useTempFiles: false,
   })
 );
 
