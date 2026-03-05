@@ -15,7 +15,7 @@ const Payment = () => {
   const [stripePromise, setStripePromise] = useState(null);
   useEffect(() => {
     loadStripe(
-      "pk_test_51SsX0oGYwxTwogKWYYeq93CjPGg5PAWUUpqMehC1hj4GKc0ULyAKtavkVOzmuu3OPmMFhxGKU5R4EehTCGeJoJaA00pRyCocmp"
+      import.meta.env.VITE_STRIPE_PUBLIC_KEY
     )
       .then((stripe) => setStripePromise(stripe))
       .catch((err) => console.log(err));
