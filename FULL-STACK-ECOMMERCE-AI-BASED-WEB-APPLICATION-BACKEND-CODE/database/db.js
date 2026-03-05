@@ -9,7 +9,7 @@ export const database = new Client({
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
   port: Number(process.env.DB_PORT),
-  ssl: false,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
 export const connectDB = async () => {
@@ -21,3 +21,4 @@ export const connectDB = async () => {
     process.exit(1);
   }
 };
+
