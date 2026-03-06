@@ -15,4 +15,8 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_CLIENT_SECRET,
 });
 
+app.listen(process.env.PORT, () => {
+  console.log(Server running on port );
+});
+
 export default app;
