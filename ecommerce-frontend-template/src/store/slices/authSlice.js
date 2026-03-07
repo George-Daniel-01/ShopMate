@@ -34,6 +34,7 @@ export const login = createAsyncThunk(
       });
       toast.success(res.data.message);
       thunkAPI.dispatch(toggleAuthPopup());
+      localStorage.setItem("token", res.data.token);
       return res.data.user;
     } catch (error) {
       toast.error(error.response?.data?.message || "Login failed");
