@@ -1,19 +1,24 @@
-﻿import pkg from "pg";
+import pkg from "pg";
 import dotenv from "dotenv";
 dotenv.config({ path: "./config/config.env" });
 const { Pool } = pkg;
 
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 export const database = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
+  max: 1,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 10000,
 });
 
 export const connectDB = async () => {
   try {
-    await database.query("SET search_path TO public");
-    console.log("✅ Connected to PostgreSQL successfully");
+    await database.query("SELECT 1");
+    console.log("Connected to PostgreSQL successfully");
   } catch (error) {
-    console.error("❌ Database connection failed:", error.message);
+    console.error("Database connection failed:", error.message);
     process.exit(1);
   }
 };
