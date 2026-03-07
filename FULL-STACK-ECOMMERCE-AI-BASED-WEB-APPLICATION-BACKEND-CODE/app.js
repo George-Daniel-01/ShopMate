@@ -23,7 +23,6 @@ app.use(
   })
 );
 
-// Webhook route with RAW body parser (must be before express.json)
 app.post(
   "/api/v1/payment/webhook",
   express.raw({ type: "application/json" }),
@@ -52,14 +51,11 @@ app.post(
           `UPDATE orders SET paid_at = NOW() WHERE id = $1 RETURNING *`,
           [paymentTableUpdateResult.rows[0].order_id]
         );
-
         const orderId = paymentTableUpdateResult.rows[0].order_id;
-
         const { rows: orderedItems } = await database.query(
           `SELECT product_id, quantity FROM order_items WHERE order_id = $1`,
           [orderId]
         );
-
         for (const item of orderedItems) {
           await database.query(
             `UPDATE products SET stock = stock - $1 WHERE id = $2`,
@@ -67,9 +63,7 @@ app.post(
           );
         }
       } catch (error) {
-        return res
-          .status(500)
-          .send(`Error updating paid_at timestamp in orders table.`);
+        return res.status(500).send(`Error updating paid_at timestamp in orders table.`);
       }
     }
     res.status(200).send({ received: true });
@@ -78,23 +72,20 @@ app.post(
 
 app.use(cookieParser());
 
-// Ã¢Å“â€¦ FIXED: useTempFiles set to false so it works on Vercel (read-only filesystem)
 app.use(
   fileUpload({
-    useTempFiles: false,
+    useTempFiles: true,
+    tempFileDir: "/tmp/",
   })
 );
 
-// These parsers should come AFTER fileUpload
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/product", productRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/order", orderRouter);
-
 
 app.use(errorMiddleware);
 
