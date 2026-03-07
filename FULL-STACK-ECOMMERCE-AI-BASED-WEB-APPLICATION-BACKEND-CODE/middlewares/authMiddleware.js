@@ -10,7 +10,7 @@ export const isAuthenticated = catchAsyncErrors(async (req, res, next) => {
   console.log("Token:", req.cookies?.token);
   console.log("========================================");
   
-  const { token } = req.cookies;
+  const token = req.cookies?.token || req.headers?.authorization?.replace("Bearer ", "");
   if (!token) {
     console.log("No token found - rejecting request");
     return next(new ErrorHandler("Please login to access this resource.", 401));
