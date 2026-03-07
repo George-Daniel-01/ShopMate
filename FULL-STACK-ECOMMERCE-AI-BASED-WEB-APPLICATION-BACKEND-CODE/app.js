@@ -18,7 +18,7 @@ config({ path: "./config/config.env" });
 
 app.use(
   cors({
-    origin: [process.env.FRONTEND_URL, process.env.DASHBOARD_URL],
+    origin: function(origin, callback) { callback(null, true) },
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
