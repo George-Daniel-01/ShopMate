@@ -3,7 +3,6 @@ import { config } from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import fileUpload from "express-fileupload";
-import { createTables } from "./utils/createTables.js";
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 import authRouter from "./router/authRoutes.js";
 import productRouter from "./router/productRoutes.js";
@@ -79,7 +78,7 @@ app.post(
 
 app.use(cookieParser());
 
-// âœ… FIXED: useTempFiles set to false so it works on Vercel (read-only filesystem)
+// Ã¢Å“â€¦ FIXED: useTempFiles set to false so it works on Vercel (read-only filesystem)
 app.use(
   fileUpload({
     useTempFiles: false,
@@ -96,7 +95,6 @@ app.use("/api/v1/product", productRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/order", orderRouter);
 
-createTables();
 
 app.use(errorMiddleware);
 
