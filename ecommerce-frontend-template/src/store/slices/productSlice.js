@@ -90,7 +90,7 @@ export const fetchProductWithAI = createAsyncThunk(
   "product/ai-search",
   async (userPrompt, thunkAPI) => {
     try {
-      const res = await axiosInstance.post(`/product/ai-search`, userPrompt);
+      const res = await axiosInstance.post(`/product/ai-search`, { userPrompt });
       thunkAPI.dispatch(toggleAIModal());
       return res.data;
     } catch (error) {
