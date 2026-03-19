@@ -1,6 +1,7 @@
 import pkg from "pg";
 import dotenv from "dotenv";
 dotenv.config({ path: "./config/config.env" });
+
 const { Pool } = pkg;
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -13,12 +14,12 @@ export const database = new Pool({
   idleTimeoutMillis: 10000,
 });
 
-export const connectDB = async () => {
+export const connectDB = async (): Promise<void> => {
   try {
     await database.query("SELECT 1");
     console.log("Connected to PostgreSQL successfully");
   } catch (error) {
-    console.error("Database connection failed:", error.message);
+    console.error("Database connection failed:", (error as Error).message);
     process.exit(1);
   }
 };
