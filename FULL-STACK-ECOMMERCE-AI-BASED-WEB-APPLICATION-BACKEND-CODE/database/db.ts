@@ -1,3 +1,6 @@
+import dns from "dns";
+dns.setDefaultResultOrder("ipv4first");
+
 import pkg from "pg";
 import dotenv from "dotenv";
 dotenv.config({ path: "./config/config.env" });
@@ -12,6 +15,7 @@ export const database = new Pool({
   max: 1,
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 10000,
+  family: 4,
 });
 
 export const connectDB = async (): Promise<void> => {
