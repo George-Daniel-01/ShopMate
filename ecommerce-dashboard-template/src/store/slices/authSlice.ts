@@ -1,4 +1,4 @@
-﻿import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { axiosInstance } from "../../lib/axios";
 import { toast } from "react-toastify";
 import type { AuthState, User } from "../../types/index";
@@ -40,6 +40,7 @@ export const login = (data: FormData) => async (dispatch: AppDispatch) => {
   try {
     const res = await axiosInstance.post("/auth/login", data);
     if (res.data.user.role === "Admin") {
+      localStorage.setItem("token", res.data.token);
       dispatch(authSlice.actions.loginSuccess(res.data.user));
       toast.success(res.data.message);
     } else {
@@ -66,6 +67,7 @@ export const logout = () => async (dispatch: AppDispatch) => {
   dispatch(authSlice.actions.logoutRequest());
   try {
     const res = await axiosInstance.get("/auth/logout");
+    localStorage.removeItem("token");
     dispatch(authSlice.actions.logoutSuccess());
     toast.success(res.data.message);
     dispatch(authSlice.actions.resetAuthSlice());
@@ -129,3 +131,5 @@ export const resetAuthSlice = () => (dispatch: AppDispatch) => {
 };
 
 export default authSlice.reducer;
+
+
