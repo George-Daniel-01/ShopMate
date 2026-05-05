@@ -12,6 +12,7 @@ const ReviewsContainer = ({ product, productReviews }: { product: import("../../
 
   const [rating, setRating] = useState(1);
   const [comment, setComment] = useState("");
+  const [hoveredRating, setHoveredRating] = useState(0);
 
   const handleReviewSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,20 +29,29 @@ const ReviewsContainer = ({ product, productReviews }: { product: import("../../
       {authUser && (
         <form onSubmit={handleReviewSubmit} className="mb-8 space-y-4">
           <h4 className="text-lg font-semibold">Leave a Review</h4>
+
+          {/* ✅ FIX: replaced corrupted â˜… character with Star component */}
           <div className="flex items-center space-x-2">
             {[...Array(5)].map((_, i) => (
               <button
                 key={i}
                 type="button"
                 onClick={() => setRating(i + 1)}
-                className={`text-2xl ${
-                  i < rating ? "text-yellow-400" : "text-gray-300"
-                }`}
+                onMouseEnter={() => setHoveredRating(i + 1)}
+                onMouseLeave={() => setHoveredRating(0)}
+                className="focus:outline-none"
               >
-                â˜…
+                <Star
+                  className={`w-7 h-7 transition-colors ${
+                    i < (hoveredRating || rating)
+                      ? "text-yellow-400 fill-yellow-400"
+                      : "text-gray-300"
+                  }`}
+                />
               </button>
             ))}
           </div>
+
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
@@ -49,7 +59,7 @@ const ReviewsContainer = ({ product, productReviews }: { product: import("../../
             placeholder="Write your review..."
             className="w-full p-3 rounded-md border-border bg-background text-foreground"
           />
-        
+
           <button
             type="submit"
             disabled={isPostingReview}

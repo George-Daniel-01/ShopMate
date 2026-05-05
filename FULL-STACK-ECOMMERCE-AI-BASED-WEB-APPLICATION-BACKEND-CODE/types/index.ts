@@ -57,12 +57,9 @@ export interface IPaymentResult {
   message?: string;
 }
 
-export interface IAIResult {
-  success: boolean;
-  products?: IProduct[];
-  message?: string;
-}
+
 
 export interface AuthenticatedRequest extends Request {
   user: IUser;
 }
+

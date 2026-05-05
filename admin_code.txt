@@ -1,3 +1,1871 @@
+﻿
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\eslint.config.js
+# ==============================================================
+
+import js from '@eslint/js'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+
+export default [
+  { ignores: ['dist'] },
+  {
+    files: ['**/*.{js,jsx}'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        ecmaFeatures: { jsx: true },
+        sourceType: 'module',
+      },
+    },
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      ...reactHooks.configs.recommended.rules,
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
+    },
+  },
+]
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\postcss.config.js
+# ==============================================================
+
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\tailwind.config.js
+# ==============================================================
+
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  theme: {
+    extend: {
+      backgroundImage: {
+        "dark-gradient": "linear-gradient(195deg, #42424a, #191919)",
+        "red-gradient": "linear-gradient(195deg, #e25656, #ff0000)",
+        "blue-gradient": "linear-gradient(195deg, #6fc7ce, #004cff)",
+         
+      },
+    },
+  },
+  plugins: [],
+};
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\vite.config.ts
+# ==============================================================
+
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+export default defineConfig({ plugins: [react()] });
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\vite-env.d.ts
+# ==============================================================
+
+/// <reference types="vite/client" />
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\lib\axios.ts
+# ==============================================================
+
+import axios from "axios";
+
+export const axiosInstance = axios.create({
+  baseURL: import.meta.env.MODE === "development"
+    ? "http://localhost:4000/api/v1"
+    : import.meta.env.VITE_API_URL,
+  withCredentials: true,
+});
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\lib\helper.ts
+# ==============================================================
+
+export interface MonthEntry { month: string; key: number; }
+
+export const getLastNMonths = (n: number): MonthEntry[] => {
+  const months: MonthEntry[] = [];
+  const now = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({ month: d.toLocaleString("en-US", { month: "short", year: "numeric" }), key: d.getTime() });
+  }
+  return months;
+};
+
+export const formatNumber = (num: number): string => {
+  if (num < 1000) return num.toString();
+  if (num < 1000000) return (num / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+  if (num < 1000000000) return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+  return (num / 1000000000).toFixed(1).replace(/\.0$/, "") + "B";
+};
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\store\hooks.ts
+# ==============================================================
+
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState } from "../types/index";
+import type { AppDispatch } from "./store";
+
+export const useAppDispatch = () => useDispatch<AppDispatch>();
+export const useAppSelector = <T>(selector: (state: RootState) => T): T =>
+  useSelector(selector);
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\store\store.ts
+# ==============================================================
+
+import { configureStore } from "@reduxjs/toolkit";
+import extraReducer from "./slices/extraSlice";
+import authReducer from "./slices/authSlice";
+import adminReducer from "./slices/adminSlice";
+import productReducer from "./slices/productsSlice";
+import orderReducer from "./slices/orderSlice";
+
+export const store = configureStore({
+  reducer: {
+    extra: extraReducer,
+    auth: authReducer,
+    admin: adminReducer,
+    product: productReducer,
+    order: orderReducer,
+  },
+});
+
+export type AppDispatch = typeof store.dispatch;
+export type AppStore = typeof store;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\store\slices\adminSlice.ts
+# ==============================================================
+
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import axios from "axios";
+import toast from "react-hot-toast";
+import type { AdminState, User } from "../../types/index";
+import type { AppDispatch } from "../store";
+
+const axiosInstance = axios.create({
+  baseURL: import.meta.env.MODE === "development" ? "http://localhost:4000/api/v1" : import.meta.env.VITE_API_URL,
+  withCredentials: true,
+});
+
+const initialState: AdminState = {
+  loading: false, users: [], totalUsers: 0, totalRevenueAllTime: 0,
+  todayRevenue: 0, yesterdayRevenue: 0, totalUsersCount: 0,
+  monthlySales: [], orderStatusCounts: {}, topSellingProducts: [],
+  lowStockProducts: 0, revenueGrowth: "0%", newUsersThisMonth: 0, currentMonthSales: 0,
+};
+
+export const adminSlice = createSlice({
+  name: "admin",
+  initialState,
+  reducers: {
+    getAllUsersRequest(state) { state.loading = true; },
+    getAllUsersSuccess(state, action: PayloadAction<{ users: User[]; totalUsers: number }>) {
+      state.loading = false; state.users = action.payload.users; state.totalUsers = action.payload.totalUsers;
+    },
+    getAllUsersFailed(state) { state.loading = false; },
+    deleteUserRequest(state) { state.loading = true; },
+    deleteUserSuccess(state, action: PayloadAction<string>) {
+      state.loading = false;
+      state.users = state.users.filter((u) => u.id !== action.payload);
+      state.totalUsers = Math.max(0, state.totalUsers - 1);
+      state.totalUsersCount = Math.max(0, state.totalUsersCount - 1);
+    },
+    deleteUserFailed(state) { state.loading = false; },
+    getStatsRequest(state) { state.loading = true; },
+    getStatsSuccess(state, action: PayloadAction<Partial<AdminState>>) {
+      state.loading = false;
+      state.totalRevenueAllTime = action.payload.totalRevenueAllTime ?? 0;
+      state.todayRevenue = action.payload.todayRevenue ?? 0;
+      state.yesterdayRevenue = action.payload.yesterdayRevenue ?? 0;
+      state.totalUsersCount = action.payload.totalUsersCount ?? 0;
+      state.monthlySales = action.payload.monthlySales ?? [];
+      state.orderStatusCounts = action.payload.orderStatusCounts ?? {};
+      state.topSellingProducts = action.payload.topSellingProducts ?? [];
+      state.lowStockProducts = (action.payload as any).lowStockProducts?.length ?? 0;
+      state.revenueGrowth = action.payload.revenueGrowth ?? "0%";
+      state.newUsersThisMonth = action.payload.newUsersThisMonth ?? 0;
+      state.currentMonthSales = action.payload.currentMonthSales ?? 0;
+    },
+    getStatsFailed(state) { state.loading = false; },
+  },
+});
+
+export const fetchAllUsers = (page?: number) => async (dispatch: AppDispatch) => {
+  dispatch(adminSlice.actions.getAllUsersRequest());
+  await axiosInstance.get(`/admin/getallusers?page=${page || 1}`)
+    .then((res) => dispatch(adminSlice.actions.getAllUsersSuccess(res.data)))
+    .catch(() => dispatch(adminSlice.actions.getAllUsersFailed()));
+};
+
+export const deleteUser = (id: string, page: number) => async (dispatch: AppDispatch, getState: () => any) => {
+  dispatch(adminSlice.actions.deleteUserRequest());
+  await axiosInstance.delete(`/admin/delete/${id}`)
+    .then((res) => {
+      dispatch(adminSlice.actions.deleteUserSuccess(id));
+      toast.success(res.data.message || "User deleted successfully");
+      const state = getState();
+      const updatedTotal = state.admin.totalUsers;
+      const updatedMaxPage = Math.ceil(updatedTotal / 10) || 1;
+      const validPage = Math.min(page, updatedMaxPage);
+      dispatch(fetchAllUsers(validPage));
+    })
+    .catch((error: any) => {
+      dispatch(adminSlice.actions.deleteUserFailed());
+      toast.error(error.response?.data?.message || "Failed to delete user.");
+    });
+};
+
+export const getDashboardStats = () => async (dispatch: AppDispatch) => {
+  dispatch(adminSlice.actions.getStatsRequest());
+  await axiosInstance.get(`/admin/fetch/dashboard-stats`)
+    .then((res) => dispatch(adminSlice.actions.getStatsSuccess(res.data)))
+    .catch(() => dispatch(adminSlice.actions.getStatsFailed()));
+};
+
+export default adminSlice.reducer;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\store\slices\authSlice.ts
+# ==============================================================
+
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { axiosInstance } from "../../lib/axios";
+import { toast } from "react-toastify";
+import type { AuthState, User } from "../../types/index";
+import type { AppDispatch } from "../store";
+
+const initialState: AuthState = { loading: false, user: null, isAuthenticated: false };
+
+const authSlice = createSlice({
+  name: "auth",
+  initialState,
+  reducers: {
+    loginRequest(state) { state.loading = true; },
+    loginSuccess(state, action: PayloadAction<User>) { state.loading = false; state.user = action.payload; state.isAuthenticated = true; },
+    loginFailed(state) { state.loading = false; },
+    getUserRequest(state) { state.loading = true; },
+    getUserSuccess(state, action: PayloadAction<User>) { state.loading = false; state.user = action.payload; state.isAuthenticated = true; },
+    getUserFailed(state) { state.loading = false; state.user = null; state.isAuthenticated = false; },
+    logoutRequest(state) { state.loading = true; },
+    logoutSuccess(state) { state.loading = false; state.user = null; state.isAuthenticated = false; },
+    logoutFailed(state) { state.loading = false; },
+    forgotPasswordRequest(state) { state.loading = true; },
+    forgotPasswordSuccess(state) { state.loading = false; },
+    forgotPasswordFailed(state) { state.loading = false; },
+    resetPasswordRequest(state) { state.loading = true; },
+    resetPasswordSuccess(state, action: PayloadAction<User>) { state.loading = false; state.isAuthenticated = true; state.user = action.payload; },
+    resetPasswordFailed(state) { state.loading = false; },
+    updateProfileRequest(state) { state.loading = true; },
+    updateProfileSuccess(state, action: PayloadAction<User>) { state.loading = false; state.user = action.payload; },
+    updateProfileFailed(state) { state.loading = false; },
+    updatePasswordRequest(state) { state.loading = true; },
+    updatePasswordSuccess(state) { state.loading = false; },
+    updatePasswordFailed(state) { state.loading = false; },
+    resetAuthSlice(state) { state.loading = false; },
+  },
+});
+
+export const login = (data: FormData) => async (dispatch: AppDispatch) => {
+  dispatch(authSlice.actions.loginRequest());
+  try {
+    const res = await axiosInstance.post("/auth/login", data);
+    if (res.data.user.role === "Admin") {
+      dispatch(authSlice.actions.loginSuccess(res.data.user));
+      toast.success(res.data.message);
+    } else {
+      dispatch(authSlice.actions.loginFailed());
+      toast.error("Access denied. Admins only.");
+    }
+  } catch (error: any) {
+    dispatch(authSlice.actions.loginFailed());
+    toast.error(error.response?.data?.message || "Login failed.");
+  }
+};
+
+export const getUser = () => async (dispatch: AppDispatch) => {
+  dispatch(authSlice.actions.getUserRequest());
+  try {
+    const res = await axiosInstance.get("/auth/me");
+    dispatch(authSlice.actions.getUserSuccess(res.data.user));
+  } catch {
+    dispatch(authSlice.actions.getUserFailed());
+  }
+};
+
+export const logout = () => async (dispatch: AppDispatch) => {
+  dispatch(authSlice.actions.logoutRequest());
+  try {
+    const res = await axiosInstance.get("/auth/logout");
+    dispatch(authSlice.actions.logoutSuccess());
+    toast.success(res.data.message);
+    dispatch(authSlice.actions.resetAuthSlice());
+  } catch (error: any) {
+    dispatch(authSlice.actions.logoutFailed());
+    toast.error(error.response?.data?.message || "Logout failed.");
+    dispatch(authSlice.actions.resetAuthSlice());
+  }
+};
+
+export const forgotPassword = (email: { email: string }) => async (dispatch: AppDispatch) => {
+  dispatch(authSlice.actions.forgotPasswordRequest());
+  try {
+    const res = await axiosInstance.post("/auth/password/forgot?frontendUrl=http://localhost:5174", email);
+    dispatch(authSlice.actions.forgotPasswordSuccess());
+    toast.success(res.data.message);
+  } catch (error: any) {
+    dispatch(authSlice.actions.forgotPasswordFailed());
+    toast.error(error.response?.data?.message || "Cannot request for reset password.");
+  }
+};
+
+export const resetPassword = (newData: FormData, token: string) => async (dispatch: AppDispatch) => {
+  dispatch(authSlice.actions.resetPasswordRequest());
+  try {
+    const res = await axiosInstance.put(`/auth/password/reset/${token}`, newData);
+    dispatch(authSlice.actions.resetPasswordSuccess(res.data.user));
+    toast.success(res.data.message);
+  } catch (error: any) {
+    dispatch(authSlice.actions.resetPasswordFailed());
+    toast.error(error.response?.data?.message || "Failed to reset password.");
+  }
+};
+
+export const updateAdminProfile = (data: FormData) => async (dispatch: AppDispatch) => {
+  dispatch(authSlice.actions.updateProfileRequest());
+  try {
+    const res = await axiosInstance.put("/auth/profile/update", data);
+    dispatch(authSlice.actions.updateProfileSuccess(res.data.user));
+    toast.success(res.data.message);
+  } catch (error: any) {
+    dispatch(authSlice.actions.updateProfileFailed());
+    toast.error(error.response?.data?.message || "Failed to update profile.");
+  }
+};
+
+export const updateAdminPassword = (data: FormData) => async (dispatch: AppDispatch) => {
+  dispatch(authSlice.actions.updatePasswordRequest());
+  try {
+    const res = await axiosInstance.put("/auth/password/update", data);
+    dispatch(authSlice.actions.updatePasswordSuccess());
+    toast.success(res.data.message);
+  } catch (error: any) {
+    dispatch(authSlice.actions.updatePasswordFailed());
+    toast.error(error.response?.data?.message || "Failed to update password.");
+  }
+};
+
+export const resetAuthSlice = () => (dispatch: AppDispatch) => {
+  dispatch(authSlice.actions.resetAuthSlice());
+};
+
+export default authSlice.reducer;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\store\slices\extraSlice.ts
+# ==============================================================
+
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import type { ExtraState } from "../../types/index";
+
+const initialState: ExtraState = {
+  openedComponent: "Dashboard",
+  isNavbarOpened: false,
+  isViewProductModalOpened: false,
+  isCreateProductModalOpened: false,
+  isUpdateProductModalOpened: false,
+};
+
+const extraSlice = createSlice({
+  name: "extra",
+  initialState,
+  reducers: {
+    toggleComponent: (state, action: PayloadAction<string>) => {
+      state.openedComponent = action.payload;
+    },
+    toggleNavbar: (state) => { state.isNavbarOpened = !state.isNavbarOpened; },
+    toggleCreateProductModal: (state) => { state.isCreateProductModalOpened = !state.isCreateProductModalOpened; },
+    toggleViewProductModal: (state) => { state.isViewProductModalOpened = !state.isViewProductModalOpened; },
+    toggleUpdateProductModal: (state) => { state.isUpdateProductModalOpened = !state.isUpdateProductModalOpened; },
+  },
+});
+
+export const { toggleComponent, toggleCreateProductModal, toggleNavbar, toggleUpdateProductModal, toggleViewProductModal } = extraSlice.actions;
+export default extraSlice.reducer;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\store\slices\orderSlice.ts
+# ==============================================================
+
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import axios from "axios";
+import toast from "react-hot-toast";
+import type { Order, OrderState } from "../../types/index";
+
+const axiosInstance = axios.create({ baseURL: "http://localhost:4000/api/v1", withCredentials: true });
+
+export const fetchAllOrders = createAsyncThunk<Order[]>("orders/fetchAll", async (_, thunkAPI) => {
+  try {
+    const { data } = await axiosInstance.get("/order/admin/getall");
+    return data.orders as Order[];
+  } catch (error: any) {
+    return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch orders");
+  }
+});
+
+export const updateOrderStatus = createAsyncThunk<Order, { orderId: string; status: string }>(
+  "orders/updateStatus",
+  async ({ orderId, status }, thunkAPI) => {
+    try {
+      const { data } = await axiosInstance.put(`/order/admin/update/${orderId}`, { status });
+      toast.success(data.message || "Order status updated successfully");
+      return data.updatedOrder as Order;
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to update order status.");
+    }
+  }
+);
+
+export const deleteOrder = createAsyncThunk<string, string>("orders/delete", async (orderId, thunkAPI) => {
+  try {
+    const { data } = await axiosInstance.delete(`/order/admin/delete/${orderId}`);
+    toast.success(data.message || "Order deleted successfully.");
+    return orderId;
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || "Failed to delete order.");
+    return thunkAPI.rejectWithValue(error.response?.data?.message);
+  }
+});
+
+const initialState: OrderState = { loading: false, orders: [], error: null };
+
+const orderSlice = createSlice({
+  name: "order",
+  initialState,
+  reducers: {},
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchAllOrders.pending, (state) => { state.loading = true; })
+      .addCase(fetchAllOrders.fulfilled, (state, action) => { state.loading = false; state.orders = action.payload; })
+      .addCase(fetchAllOrders.rejected, (state, action) => { state.loading = false; state.error = action.payload as string; })
+      .addCase(updateOrderStatus.pending, (state) => { state.loading = true; })
+      .addCase(updateOrderStatus.fulfilled, (state, action) => {
+        state.loading = false;
+        const index = state.orders.findIndex((o) => o.id === action.payload.id);
+        if (index !== -1) state.orders[index] = { ...state.orders[index], ...action.payload };
+      })
+      .addCase(updateOrderStatus.rejected, (state, action) => { state.loading = false; state.error = action.payload as string; })
+      .addCase(deleteOrder.pending, (state) => { state.loading = true; })
+      .addCase(deleteOrder.fulfilled, (state, action) => { state.loading = false; state.orders = state.orders.filter((o) => o.id !== action.payload); })
+      .addCase(deleteOrder.rejected, (state) => { state.loading = false; });
+  },
+});
+
+export default orderSlice.reducer;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\store\slices\productsSlice.ts
+# ==============================================================
+
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import axios from "axios";
+import toast from "react-hot-toast";
+import { toggleCreateProductModal, toggleUpdateProductModal } from "./extraSlice";
+import type { Product, ProductState } from "../../types/index";
+import type { AppDispatch } from "../store";
+
+const axiosInstance = axios.create({ baseURL: "http://localhost:4000/api/v1", withCredentials: true });
+
+const initialState: ProductState = { loading: false, products: [], totalProducts: 0 };
+
+const productSlice = createSlice({
+  name: "product",
+  initialState,
+  reducers: {
+    createProductRequest(state) { state.loading = true; },
+    createProductSuccess(state, action: PayloadAction<Product>) { state.loading = false; state.products = [action.payload, ...state.products]; },
+    createProductFailed(state) { state.loading = false; },
+    getAllProductsRequest(state) { state.loading = true; },
+    getAllProductsSuccess(state, action: PayloadAction<{ products: Product[]; totalProducts: number }>) {
+      state.loading = false; state.products = action.payload.products; state.totalProducts = action.payload.totalProducts;
+    },
+    getAllProductsFailed(state) { state.loading = false; },
+    updateProductRequest(state) { state.loading = true; },
+    updateProductSuccess(state, action: PayloadAction<Product>) {
+      state.loading = false;
+      state.products = state.products.map((p) => p.id === action.payload.id ? action.payload : p);
+    },
+    updateProductFailed(state) { state.loading = false; },
+    deleteProductRequest(state) { state.loading = true; },
+    deleteProductSuccess(state, action: PayloadAction<string>) {
+      state.loading = false;
+      state.products = state.products.filter((p) => p.id !== action.payload);
+      state.totalProducts = Math.max(0, state.totalProducts - 1);
+    },
+    deleteProductFailed(state) { state.loading = false; },
+  },
+});
+
+export const createNewProduct = (data: FormData) => async (dispatch: AppDispatch) => {
+  dispatch(productSlice.actions.createProductRequest());
+  await axiosInstance.post("/product/admin/create", data)
+    .then((res) => { dispatch(productSlice.actions.createProductSuccess(res.data.product)); toast.success(res.data.message || "Product created successfully."); dispatch(toggleCreateProductModal()); })
+    .catch((error: any) => { dispatch(productSlice.actions.createProductFailed()); toast.error(error.response?.data?.message || "Failed to create product."); });
+};
+
+export const fetchAllProducts = (page?: number) => async (dispatch: AppDispatch) => {
+  dispatch(productSlice.actions.getAllProductsRequest());
+  await axiosInstance.get(`/product?page=${page || 1}`)
+    .then((res) => dispatch(productSlice.actions.getAllProductsSuccess(res.data)))
+    .catch(() => dispatch(productSlice.actions.getAllProductsFailed()));
+};
+
+export const updateProduct = (data: FormData | Record<string, string>, id: string) => async (dispatch: AppDispatch) => {
+  dispatch(productSlice.actions.updateProductRequest());
+  await axiosInstance.put(`/product/admin/update/${id}`, data)
+    .then((res) => { dispatch(productSlice.actions.updateProductSuccess(res.data.updatedProduct)); toast.success(res.data.message || "Product updated successfully."); dispatch(toggleUpdateProductModal()); })
+    .catch((error: any) => { dispatch(productSlice.actions.updateProductFailed()); toast.error(error.response?.data?.message || "Failed to update product."); });
+};
+
+export const deleteProduct = (id: string, page: number) => async (dispatch: AppDispatch, getState: () => any) => {
+  dispatch(productSlice.actions.deleteProductRequest());
+  await axiosInstance.delete(`/product/admin/delete/${id}`)
+    .then((res) => {
+      dispatch(productSlice.actions.deleteProductSuccess(id));
+      toast.success(res.data.message || "Product deleted successfully.");
+      const state = getState();
+      const updatedTotal = state.product.totalProducts;
+      const updatedMaxPage = Math.ceil(updatedTotal / 10) || 1;
+      const validPage = Math.min(page, updatedMaxPage);
+      dispatch(fetchAllProducts(validPage));
+    })
+    .catch((error: any) => { dispatch(productSlice.actions.deleteProductFailed()); toast.error(error.response?.data?.message || "Failed to delete product."); });
+};
+
+export default productSlice.reducer;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\types\index.ts
+# ==============================================================
+
+export interface ProductImage {
+  url: string;
+  public_id: string;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  title?: string;
+  description: string;
+  price: number;
+  category: string;
+  ratings: number;
+  images: ProductImage[];
+  stock: number;
+  created_by: string;
+  created_at: string;
+  review_count?: number;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: "User" | "Admin";
+  avatar?: { url: string; public_id: string } | null;
+  created_at: string;
+}
+
+export interface OrderItem {
+  order_item_id: string;
+  order_id: string;
+  product_id: string;
+  quantity: number;
+  price: number;
+  image: string;
+  title: string;
+}
+
+export interface ShippingInfo {
+  full_name: string;
+  state: string;
+  city: string;
+  country: string;
+  address: string;
+  pincode: string;
+  phone: string;
+}
+
+export interface Order {
+  id: string;
+  buyer_id: string;
+  total_price: number;
+  tax_price: number;
+  shipping_price: number;
+  order_status: "Processing" | "Shipped" | "Delivered" | "Cancelled";
+  paid_at: string | null;
+  created_at: string;
+  order_items: OrderItem[];
+  shipping_info: ShippingInfo;
+}
+
+export interface TopSellingProduct {
+  name: string;
+  image: string;
+  category: string;
+  ratings: number;
+  total_sold: number;
+}
+
+export interface MonthlySale {
+  month: string;
+  totalsales: number;
+}
+
+export interface OrderStatusCounts {
+  Processing?: number;
+  Shipped?: number;
+  Delivered?: number;
+  Cancelled?: number;
+  [key: string]: number | undefined;
+}
+
+export interface AuthState {
+  loading: boolean;
+  user: User | null;
+  isAuthenticated: boolean;
+}
+
+export interface AdminState {
+  loading: boolean;
+  users: User[];
+  totalUsers: number;
+  totalRevenueAllTime: number;
+  todayRevenue: number;
+  yesterdayRevenue: number;
+  totalUsersCount: number;
+  monthlySales: MonthlySale[];
+  orderStatusCounts: OrderStatusCounts;
+  topSellingProducts: TopSellingProduct[];
+  lowStockProducts: number;
+  revenueGrowth: string;
+  newUsersThisMonth: number;
+  currentMonthSales: number;
+}
+
+export interface ExtraState {
+  openedComponent: string;
+  isNavbarOpened: boolean;
+  isViewProductModalOpened: boolean;
+  isCreateProductModalOpened: boolean;
+  isUpdateProductModalOpened: boolean;
+}
+
+export interface ProductState {
+  loading: boolean;
+  products: Product[];
+  totalProducts: number;
+}
+
+export interface OrderState {
+  loading: boolean;
+  orders: Order[];
+  error: string | null;
+}
+
+export interface RootState {
+  auth: AuthState;
+  admin: AdminState;
+  extra: ExtraState;
+  product: ProductState;
+  order: OrderState;
+}
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\App.tsx
+# ==============================================================
+
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import SideBar from "./components/SideBar";
+import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import { ToastContainer } from "react-toastify";
+import { useEffect } from "react";
+import Dashboard from "./components/Dashboard";
+import Orders from "./components/Orders";
+import Products from "./components/Products";
+import Profile from "./components/Profile";
+import Users from "./components/Users";
+import { getUser } from "./store/slices/authSlice";
+import { getDashboardStats } from "./store/slices/adminSlice";
+import { Loader } from "lucide-react";
+import { useAppDispatch, useAppSelector } from "./store/hooks";
+
+function App() {
+  const { openedComponent } = useAppSelector((state) => state.extra);
+  const { user, isAuthenticated, loading } = useAppSelector((state) => state.auth);
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    dispatch(getUser());
+    dispatch(getDashboardStats());
+  }, [dispatch]);
+
+  const renderDashboardContent = () => {
+    switch (openedComponent) {
+      case "Dashboard": return <Dashboard />;
+      case "Orders": return <Orders />;
+      case "Users": return <Users />;
+      case "Profile": return <Profile />;
+      case "Products": return <Products />;
+      default: return <Dashboard />;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader className="w-10 h-10 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
+  return (
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/password/forgot" element={<ForgotPassword />} />
+        <Route path="/password/reset/:token" element={<ResetPassword />} />
+        <Route path="/" element={
+          isAuthenticated && user?.role === "Admin" ? (
+            <div className="flex min-h-screen"><SideBar />{renderDashboardContent()}</div>
+          ) : <Navigate to="/login" />
+        } />
+      </Routes>
+      <ToastContainer position="bottom-center" />
+    </Router>
+  );
+}
+
+export default App;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\main.tsx
+# ==============================================================
+
+import { createRoot } from "react-dom/client";
+import "./index.css";
+import App from "./App.tsx";
+import { Provider } from "react-redux";
+import { store } from "./store/store.ts";
+
+const rootElement = document.getElementById("root");
+if (!rootElement) throw new Error("Root element not found");
+
+createRoot(rootElement).render(
+  <Provider store={store}>
+    <App />
+  </Provider>
+);
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\components\Dashboard.tsx
+# ==============================================================
+
+import Header from "./Header";
+import MiniSummary from "./dashboard-components/MiniSummary";
+import TopSellingProducts from "./dashboard-components/TopSellingProducts";
+import Stats from "./dashboard-components/Stats";
+import MonthlySalesChart from "./dashboard-components/MonthlySalesChart";
+import OrdersChart from "./dashboard-components/OrdersChart";
+import TopProductsChart from "./dashboard-components/TopProductsChart";
+
+const Dashboard = () => (
+  <main className="p-[10px] pl-[10px] md:pl-[17rem] w-full">
+    <div className="flex-1 md:p-6">
+      <Header />
+      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <p>Check the sales and value.</p>
+      <Stats />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
+        <MonthlySalesChart />
+        <OrdersChart />
+        <TopProductsChart />
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 py-4">
+        <TopSellingProducts />
+        <div><MiniSummary /></div>
+      </div>
+    </div>
+  </main>
+);
+
+export default Dashboard;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\components\Header.tsx
+# ==============================================================
+
+import avatarImg from "../assets/avatar.jpg";
+import { Menu } from "lucide-react";
+import { toggleNavbar } from "../store/slices/extraSlice";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+
+const Header = () => {
+  const { user } = useAppSelector((state) => state.auth);
+  const { openedComponent } = useAppSelector((state) => state.extra);
+  const dispatch = useAppDispatch();
+
+  return (
+    <header className="flex justify-between mb-3 pb-2">
+      <p className="flex items-center gap-3 text-sm">
+        <span className="text-gray-500">{user?.name}</span>
+        <span>/</span>
+        <span>{openedComponent}</span>
+      </p>
+      <div className="flex gap-3 items-center">
+        <Menu className="block md:hidden" onClick={() => dispatch(toggleNavbar())} />
+        <img src={user?.avatar?.url || avatarImg} alt={user?.name || "avatar"} className="w-14 h-14 rounded-full object-cover" />
+      </div>
+    </header>
+  );
+};
+
+export default Header;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\components\Orders.tsx
+# ==============================================================
+
+import { useEffect, useState } from "react";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import Header from "./Header";
+import { deleteOrder, fetchAllOrders, updateOrderStatus } from "../store/slices/orderSlice";
+import type { Order, OrderItem } from "../types/index";
+
+const Orders = () => {
+  const statusArray = ["All", "Processing", "Shipped", "Delivered", "Cancelled"];
+  const dispatch = useAppDispatch();
+  const { orders, loading } = useAppSelector((state) => state.order);
+  const [selectedStatus, setSelectedStatus] = useState<Record<string, string>>({});
+  const [filterByStatus, setFilterByStatus] = useState("All");
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
+
+  useEffect(() => { dispatch(fetchAllOrders()); }, [dispatch]);
+
+  const handleStatusChange = (orderId: string, newStatus: string) => {
+    setSelectedStatus((prev) => ({ ...prev, [orderId]: newStatus }));
+    dispatch(updateOrderStatus({ orderId, status: newStatus }));
+  };
+
+  const filteredOrders = filterByStatus === "All" ? orders : orders?.filter((o: Order) => o.order_status === filterByStatus);
+  const confirmDelete = () => {
+    if (deleteConfirm.id) dispatch(deleteOrder(deleteConfirm.id));
+    setDeleteConfirm({ open: false, id: null });
+  };
+
+  return (
+    <main className="p-[10px] pl-[10px] md:pl-[17rem] w-full">
+      <div className="flex justify-between items-center p-6">
+        <Header />
+        <h1 className="text-2xl font-bold">All Orders</h1>
+        <p className="text-sm text-gray-600 mb-6">Manage all your orders.</p>
+      </div>
+      {loading ? (
+        <div className="w-40 h-40 mx-auto border-2 border-white border-t-transparent rounded-full animate-spin" />
+      ) : (
+        <>
+          {filteredOrders.length === 0 ? <p className="p-10">No orders found.</p> : (
+            <>
+              <div className="flex justify-between items-center p-6">
+                <select value={filterByStatus} onChange={(e) => setFilterByStatus(e.target.value)} className="border p-2 rounded mb-2">
+                  {statusArray.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              {filteredOrders.map((order: Order) => (
+                <div key={order.id} className="bg-white shadow-lg rounded-lg p-6 mb-6">
+                  <div className="flex justify-between items-start flex-wrap gap-4">
+                    <div>
+                      <p><strong>Order ID:</strong> {order.id}</p>
+                      <p><strong>Status:</strong> {order.order_status}</p>
+                      <p><strong>Placed At:</strong> {new Date(order.created_at).toLocaleString()}</p>
+                      <p><strong>Total Amount:</strong> ${order.total_price}</p>
+                    </div>
+                    <div>
+                      <select value={selectedStatus[order.id] || order.order_status} onChange={(e) => handleStatusChange(order.id, e.target.value)} className="border p-2 rounded mb-2">
+                        {statusArray.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <button onClick={() => setDeleteConfirm({ open: true, id: order.id })} className="ml-3 bg-red-500 hover:bg-red-600 text-white px-3 py-1">Delete</button>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <h4 className="font-semibold text-lg mb-1">Shipping Info</h4>
+                    <p><strong>Name:</strong> {order.shipping_info?.full_name}</p>
+                    <p><strong>Phone:</strong> {order.shipping_info?.phone}</p>
+                    <p><strong>Address:</strong> {order.shipping_info?.address}, {order.shipping_info?.city}, {order.shipping_info?.state}, {order.shipping_info?.pincode}</p>
+                  </div>
+                  <div className="mt-4">
+                    <h4 className="font-semibold text-lg mb-2">Ordered Items</h4>
+                    {Array.isArray(order.order_items) && order.order_items.map((item: OrderItem) => (
+                      <div key={item.order_item_id} className="flex items-center gap-4 mb-2 border-b pb-2">
+                        {item.image && <img src={item.image} alt={item.title} className="w-16 h-16 object-cover cursor-pointer" onClick={() => setPreviewImage(item.image)} />}
+                        <div>
+                          <p className="font-semibold">{item.title}</p>
+                          <p><strong>Qty:</strong> {item.quantity} | <strong>Price:</strong> ${item.price} | <strong>Total:</strong> ${item.quantity * item.price}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </>
+      )}
+      {previewImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" onClick={() => setPreviewImage(null)}>
+          <img src={previewImage} alt="preview" className="max-w-[90%] max-h-[90%] rounded shadow-xl" />
+        </div>
+      )}
+      {deleteConfirm.open && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+          <div className="bg-white p-6 rounded shadow-lg text-center max-w-sm w-full">
+            <h3 className="text-lg font-semibold mb-4">Are you sure you want to delete this order?</h3>
+            <div className="flex justify-center gap-4">
+              <button onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Yes, Delete</button>
+              <button onClick={() => setDeleteConfirm({ open: false, id: null })} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+};
+
+export default Orders;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\components\Products.tsx
+# ==============================================================
+
+import { useState, useEffect } from "react";
+import { LoaderCircle, Plus } from "lucide-react";
+import CreateProductModal from "../modals/CreateProductModal";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import Header from "./Header";
+import UpdateProductModal from "../modals/UpdateProductModal";
+import ViewProductModal from "../modals/ViewProductModal";
+import { fetchAllProducts, deleteProduct } from "../store/slices/productsSlice";
+import { toggleCreateProductModal, toggleUpdateProductModal, toggleViewProductModal } from "../store/slices/extraSlice";
+import type { Product } from "../types/index";
+
+const Products = () => {
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [maxPage, setMaxPage] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const dispatch = useAppDispatch();
+  const { isViewProductModalOpened, isCreateProductModalOpened, isUpdateProductModalOpened } = useAppSelector((state) => state.extra);
+  const { products, totalProducts, loading } = useAppSelector((state) => state.product);
+
+  useEffect(() => { dispatch(fetchAllProducts(page)); }, [dispatch, page]);
+  useEffect(() => { if (totalProducts !== undefined) setMaxPage(Math.ceil(totalProducts / 10) || 1); }, [totalProducts]);
+  useEffect(() => { if (maxPage && page > maxPage) setPage(maxPage); }, [maxPage, page]);
+
+  return (
+    <>
+      <main className="p-[10px] pl-[10px] md:pl-[17rem] w-full">
+        <div className="flex-1 md:p-6">
+          <Header />
+          <h1 className="text-2xl font-bold">All Products</h1>
+          <p className="text-sm text-gray-600 mb-6">Manage all your website products.</p>
+          <div className="p-4 sm:p-8 bg-gray-50 min-h-screen">
+            <div className={`overflow-x-auto rounded-lg ${loading ? "p-10 shadow-none" : `${products && products.length > 0 && "shadow-lg"}`}`}>
+              {loading ? (
+                <div className="w-40 h-40 mx-auto border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : products && products.length > 0 ? (
+                <table className="min-w-full bg-white border border-gray-200">
+                  <thead className="bg-blue-100 text-gray-700">
+                    <tr>
+                      <th className="py-3 px-4 text-left">Image</th>
+                      <th className="py-3 px-4 text-left">Title</th>
+                      <th className="py-3 px-4 text-left">Category</th>
+                      <th className="py-3 px-4 text-left">Price</th>
+                      <th className="py-3 px-4 text-left">Stock</th>
+                      <th className="py-3 px-4 text-left">Ratings</th>
+                      <th className="py-3 px-4 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((product: Product, index: number) => (
+                      <tr key={index} className="border-t hover:bg-gray-50 cursor-pointer" onClick={() => { setSelectedProduct(product); dispatch(toggleViewProductModal()); }}>
+                        <td className="py-3 px-4"><img src={product?.images[0]?.url} alt={product.name} className="w-10 h-10 rounded-md object-cover" /></td>
+                        <td className="px-3 py-4">{product.name}</td>
+                        <td className="px-3 py-4">{product.category}</td>
+                        <td className="px-3 py-4">${Number(product.price).toFixed(2)}</td>
+                        <td className="px-3 py-4">{product.stock}</td>
+                        <td className="px-3 py-4 text-yellow-500">{product.ratings}</td>
+                        <td className="px-4 py-3 flex gap-2">
+                          <button className="text-white rounded-md cursor-pointer px-3 py-2 font-semibold bg-blue-500 hover:bg-blue-600"
+                            onClick={(e) => { e.stopPropagation(); setSelectedProduct(product); dispatch(toggleUpdateProductModal()); }}>Update</button>
+                          <button className="text-white rounded-md cursor-pointer px-3 py-2 font-semibold bg-red-500 hover:bg-red-600"
+                            onClick={(e) => { e.stopPropagation(); dispatch(deleteProduct(product.id, page)); }}>
+                            {selectedProduct?.id === product.id && loading ? <LoaderCircle className="w-5 h-5 animate-spin" /> : "Delete"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : <h3 className="text-2xl p-6 font-bold">No products found.</h3>}
+            </div>
+            {!loading && products.length > 0 && (
+              <div className="flex justify-center mt-6 gap-4">
+                <button onClick={() => setPage((p) => Math.max(p - 1, 1))} disabled={page === 1} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded disabled:opacity-50">Previous</button>
+                <span className="px-4 py-2 text-gray-700">Page {page}</span>
+                <button onClick={() => setPage((p) => p + 1)} disabled={maxPage === page} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded disabled:opacity-50">Next</button>
+              </div>
+            )}
+          </div>
+        </div>
+        <button onClick={() => dispatch(toggleCreateProductModal())} className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg z-50" title="Create New Product">
+          <Plus size={20} />
+        </button>
+      </main>
+      {isCreateProductModalOpened && <CreateProductModal />}
+      {isUpdateProductModalOpened && <UpdateProductModal selectedProduct={selectedProduct} />}
+      {isViewProductModalOpened && <ViewProductModal selectedProduct={selectedProduct} />}
+    </>
+  );
+};
+
+export default Products;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\components\Profile.tsx
+# ==============================================================
+
+import { useState } from "react";
+import avatarImg from "../assets/avatar.jpg";
+import Header from "./Header";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { updateAdminPassword, updateAdminProfile } from "../store/slices/authSlice";
+
+const Profile = () => {
+  const { user, loading } = useAppSelector((state) => state.auth);
+  const dispatch = useAppDispatch();
+  const [editData, setEditData] = useState({ name: user?.name || "", email: user?.email || "" });
+  const [avatar, setAvatar] = useState<File | null>(null);
+  const [updatingSection, setUpdatingSection] = useState("");
+  const [passwordData, setPasswordData] = useState({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) setAvatar(e.target.files[0]);
+  };
+
+  const updateProfile = () => {
+    const formData = new FormData();
+    formData.append("name", editData.name);
+    formData.append("email", editData.email);
+    if (avatar) formData.append("avatar", avatar);
+    setUpdatingSection("Profile");
+    dispatch(updateAdminProfile(formData));
+  };
+
+  const updatePassword = () => {
+    const formData = new FormData();
+    formData.append("currentPassword", passwordData.currentPassword);
+    formData.append("newPassword", passwordData.newPassword);
+    formData.append("confirmNewPassword", passwordData.confirmNewPassword);
+    setUpdatingSection("Password");
+    dispatch(updateAdminPassword(formData));
+  };
+
+  return (
+    <main className="p-[10px] pl-[10px] md:pl-[17rem] w-full">
+      <div className="flex-1 md:p-6 mb:pb-0">
+        <Header />
+        <h1 className="text-2xl font-bold">Profile</h1>
+        <p className="text-sm text-gray-600 mb-6">Manage your profile.</p>
+      </div>
+      <div className="max-w-4xl md:px-4 py-8">
+        <div className="bg-white shadow-md rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6 mb-10">
+          <img src={user?.avatar?.url || avatarImg} alt={user?.name || "avatar"} className="w-32 h-32 rounded-full object-cover border" />
+          <div>
+            <p className="text-xl font-medium">Name: {user?.name}</p>
+            <p className="text-md text-gray-600">Email: {user?.email}</p>
+            <p className="text-sm text-blue-500">Role: {user?.role}</p>
+          </div>
+        </div>
+        <div className="bg-gray-100 p-6 rounded-2xl shadow-md mb-10">
+          <h3 className="text-xl font-semibold mb-4">Update Profile</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input type="text" name="name" value={editData.name} onChange={(e) => setEditData({ ...editData, name: e.target.value })} className="p-2 border rounded-md" placeholder="Your Name" />
+            <input type="email" name="email" value={editData.email} onChange={(e) => setEditData({ ...editData, email: e.target.value })} className="p-2 border rounded-md" placeholder="Your Email" />
+            <input type="file" name="avatar" onChange={handleAvatarChange} className="p-2 border rounded-md col-span-1 md:col-span-2" />
+          </div>
+          <button onClick={updateProfile} className="flex justify-center items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 mt-4" disabled={loading}>
+            {loading && updatingSection === "Profile" ? (<><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>Updating...</span></>) : "Update Profile"}
+          </button>
+        </div>
+        <div className="bg-gray-100 p-6 rounded-2xl shadow-md">
+          <h3 className="text-xl font-semibold mb-4">Update Password</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input type="password" name="currentPassword" value={passwordData.currentPassword} onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })} className="p-2 border rounded-md" placeholder="Current Password" />
+            <input type="password" name="newPassword" value={passwordData.newPassword} onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })} className="p-2 border rounded-md" placeholder="New Password" />
+            <input type="password" name="confirmNewPassword" value={passwordData.confirmNewPassword} onChange={(e) => setPasswordData({ ...passwordData, confirmNewPassword: e.target.value })} className="p-2 border rounded-md" placeholder="Confirm New Password" />
+          </div>
+          <button onClick={updatePassword} className="flex justify-center items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 mt-4" disabled={loading}>
+            {loading && updatingSection === "Password" ? (<><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>Updating...</span></>) : "Update Password"}
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+};
+
+export default Profile;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\components\SideBar.tsx
+# ==============================================================
+
+import { useState } from "react";
+import { LayoutDashboard, ListOrdered, Package, Users, User, LogOut, MoveLeft } from "lucide-react";
+import { Navigate } from "react-router-dom";
+import { logout } from "../store/slices/authSlice";
+import { toggleComponent, toggleNavbar } from "../store/slices/extraSlice";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+
+const SideBar = () => {
+  const [activeLink, setActiveLink] = useState(0);
+  const links = [
+    { item: <LayoutDashboard />, title: "Dashboard" },
+    { item: <ListOrdered />, title: "Orders" },
+    { item: <Package />, title: "Products" },
+    { item: <Users />, title: "Users" },
+    { item: <User />, title: "Profile" },
+  ];
+
+  const isNavbarOpened = useAppSelector((state) => state.extra.isNavbarOpened);
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const dispatch = useAppDispatch();
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+
+  return (
+    <aside className={`${isNavbarOpened ? "left-[10px]" : "-left-full"} fixed w-64 h-[97.5%] rounded-xl bg-white z-10 mt-[10px] transition-all duration-300 shadow-lg p-4 space-y-4 flex flex-col justify-between md:left-[10px]`}>
+      <nav className="space-y-2">
+        <div className="flex flex-col gap-2 py-2">
+          <h2 className="flex items-center justify-between text-xl font-bold">
+            <span>Admin Panel</span>
+            <MoveLeft className="block md:hidden" onClick={() => dispatch(toggleNavbar())} />
+          </h2>
+          <hr />
+        </div>
+        {links.map((item, index) => (
+          <button key={index} onClick={() => { setActiveLink(index); dispatch(toggleComponent(item.title)); }}
+            className={`${activeLink === index && "bg-dark-gradient text-white"} hover:bg-gray-200 w-full transition-all duration-300 rounded-md cursor-pointer px-3 py-2 flex items-center gap-2`}>
+            {item.item} {item.title}
+          </button>
+        ))}
+      </nav>
+      <button onClick={() => dispatch(logout())} className="text-white rounded-md cursor-pointer flex items-center px-3 py-2 gap-2 bg-red-gradient">
+        <LogOut /> Logout
+      </button>
+    </aside>
+  );
+};
+
+export default SideBar;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\components\Users.tsx
+# ==============================================================
+
+import { useEffect, useState } from "react";
+import avatarImg from "../assets/avatar.jpg";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import Header from "./Header";
+import { fetchAllUsers, deleteUser } from "../store/slices/adminSlice";
+import type { User } from "../types/index";
+
+const Users = () => {
+  const [page, setPage] = useState(1);
+  const { loading, users, totalUsers } = useAppSelector((state) => state.admin);
+  const dispatch = useAppDispatch();
+  const [maxPage, setMaxPage] = useState<number | null>(null);
+
+  useEffect(() => { dispatch(fetchAllUsers(page)); }, [page, dispatch]);
+  useEffect(() => { if (totalUsers !== undefined) setMaxPage(Math.ceil(totalUsers / 10) || 1); }, [totalUsers]);
+  useEffect(() => { if (maxPage && page > maxPage) setPage(maxPage); }, [maxPage, page]);
+
+  return (
+    <main className="p-[10px] pl-[10px] md:pl-[17rem] w-full">
+      <div className="flex-1 md:p-6">
+        <Header />
+        <h1 className="text-2xl font-bold">All Users</h1>
+        <p className="text-sm text-gray-600 mb-6">Manage all your website users.</p>
+      </div>
+      <div className="p-4 sm:p-8 bg-gray-50 min-h-screen">
+        <div className={`overflow-x-auto rounded-lg ${loading ? "p-10 shadow-none" : `${users && users.length > 0 && "shadow-lg"}`}`}>
+          {loading ? (
+            <div className="w-40 h-40 mx-auto border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : users && users.length > 0 ? (
+            <table className="min-w-full bg-white border border-gray-200">
+              <thead className="bg-blue-100 text-gray-700">
+                <tr>
+                  <th className="py-3 px-4 text-left">Avatar</th>
+                  <th className="py-3 px-4 text-left">Name</th>
+                  <th className="py-3 px-4 text-left">Email</th>
+                  <th className="py-3 px-4 text-left">Registered On</th>
+                  <th className="py-3 px-4 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((user: User, index: number) => (
+                  <tr key={index} className="border-t hover:bg-gray-50">
+                    <td className="py-3 px-4"><img src={user?.avatar?.url || avatarImg} alt="avatar" className="w-10 h-10 rounded-full object-cover" /></td>
+                    <td className="px-3 py-4">{user.name}</td>
+                    <td className="px-3 py-4">{user.email}</td>
+                    <td className="px-3 py-4">{new Date(user.created_at).toLocaleDateString()}</td>
+                    <td className="px-3 py-4">
+                      <button onClick={() => dispatch(deleteUser(user.id, page))} className="text-white rounded-md cursor-pointer px-3 py-2 font-semibold bg-red-gradient hover:opacity-90">Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : <h3>No Users Found!!</h3>}
+        </div>
+        {!loading && users.length > 0 && (
+          <div className="flex justify-center mt-6 gap-4">
+            <button onClick={() => setPage((p) => Math.max(p - 1, 1))} disabled={page === 1} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded disabled:opacity-50">Previous</button>
+            <span className="px-4 py-2 text-gray-700">Page {page}</span>
+            <button onClick={() => setPage((p) => p + 1)} disabled={maxPage === page} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded disabled:opacity-50">Next</button>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+};
+
+export default Users;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\components\dashboard-components\MiniSummary.tsx
+# ==============================================================
+
+import { Wallet, PackageCheck, TrendingUp, AlertTriangle, BarChart4, UserPlus } from "lucide-react";
+import { useAppSelector } from "../../store/hooks";
+
+const MiniSummary = () => {
+  const { topSellingProducts, lowStockProducts, revenueGrowth, newUsersThisMonth, currentMonthSales, orderStatusCounts } = useAppSelector((state) => state.admin);
+  const totalOrders = Object.values(orderStatusCounts).reduce((acc, count) => acc + (count ?? 0), 0);
+
+  const summary = [
+    { text: "Total Sales this Month", subText: `This month sales: PKR ${currentMonthSales * 283}`, icon: <Wallet className="text-green-600" /> },
+    { text: "Total Orders Placed", subText: `Total orders: ${totalOrders}`, icon: <PackageCheck className="text-blue-600" /> },
+    { text: "Top Selling Product", subText: `Best Seller: ${topSellingProducts[0]?.name} (${topSellingProducts[0]?.total_sold} sold)`, icon: <TrendingUp className="text-emerald-600" /> },
+    { text: "Low Stock Alerts", subText: `${lowStockProducts} products running low`, icon: <AlertTriangle className="text-red-600" /> },
+    { text: "Revenue Growth Rate", subText: `Revenue ${revenueGrowth.includes("+") ? "up" : "down"} by ${revenueGrowth}`, icon: <BarChart4 className="text-purple-600" /> },
+    { text: "New Customers This Month", subText: `New customers: ${newUsersThisMonth}`, icon: <UserPlus className="text-yellow-600" /> },
+  ];
+
+  return (
+    <div className="bg-white rounded-xl p-6 shadow-md">
+      <h2 className="text-lg font-semibold mb-2">Summary</h2>
+      <p className="text-sm text-gray-500 mb-4">Key metrics for the current month</p>
+      <div className="space-y-4">
+        {summary.map((item, index) => (
+          <div key={index} className="flex items-center space-x-3">
+            {item.icon}
+            <div><p className="font-semibold">{item.text}</p><p>{item.subText}</p></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default MiniSummary;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\components\dashboard-components\MonthlySalesChart.tsx
+# ==============================================================
+
+import { useAppSelector } from "../../store/hooks";
+import { XAxis, YAxis, LineChart, Line, Tooltip, ResponsiveContainer } from "recharts";
+import { getLastNMonths } from "../../lib/helper";
+
+const MonthlySalesChart = () => {
+  const { monthlySales } = useAppSelector((state) => state.admin);
+  const months = getLastNMonths(4).map((m) => m.month);
+  const filled = months.map((m) => {
+    const found = monthlySales?.find((item) => item.month === m);
+    return { month: m, totalSales: found?.totalsales || 0 };
+  });
+
+  return (
+    <div className="bg-white p-4 rounded-xl shadow-md">
+      <h3 className="font-semibold mb-2">Monthly Sales</h3>
+      <ResponsiveContainer width="100%" height={200}>
+        <LineChart data={filled}>
+          <XAxis dataKey="month" />
+          <YAxis />
+          <Tooltip />
+          <Line type="monotone" dataKey="totalSales" stroke="#10b981" />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
+export default MonthlySalesChart;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\components\dashboard-components\OrdersChart.tsx
+# ==============================================================
+
+import { useAppSelector } from "../../store/hooks";
+import { PieChart, Pie, Tooltip, ResponsiveContainer, Cell } from "recharts";
+
+const statusColors: Record<string, string> = {
+  Processing: "#facc15",
+  Shipped: "#3b82f6",
+  Delivered: "#22c55e",
+  Cancelled: "#ef4444",
+};
+
+const OrdersChart = () => {
+  const { orderStatusCounts } = useAppSelector((state) => state.admin);
+  const orderStatusData = Object.keys(orderStatusCounts).map((status) => ({
+    status,
+    count: parseInt(String(orderStatusCounts[status] ?? 0)),
+  }));
+
+  return (
+    <div className="bg-white p-4 rounded-xl shadow-md">
+      <h3 className="font-semibold mb-2">Order Status</h3>
+      <ResponsiveContainer width="100%" height={200}>
+        <PieChart>
+          <Pie data={orderStatusData} dataKey="count" nameKey="status" cx="50%" cy="50%" outerRadius={80} label>
+            {orderStatusData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={statusColors[entry.status] || "#ccc"} />
+            ))}
+          </Pie>
+          <Tooltip />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
+export default OrdersChart;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\components\dashboard-components\Stats.tsx
+# ==============================================================
+
+import { useEffect, useState } from "react";
+import { formatNumber } from "../../lib/helper";
+import { useAppSelector } from "../../store/hooks";
+
+const Stats = () => {
+  const [revenueChange, setRevenueChange] = useState("");
+  const { totalUsersCount, todayRevenue, yesterdayRevenue, totalRevenueAllTime } = useAppSelector((state) => state.admin);
+
+  useEffect(() => {
+    const change = yesterdayRevenue === 0 ? 100 : ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100;
+    setRevenueChange(`${change >= 0 ? "+" : "-"}${change.toFixed(2)}% from yesterday`);
+  }, [todayRevenue, yesterdayRevenue]);
+
+  const stats = [
+    { title: "Today Revenue", value: formatNumber(todayRevenue), change: revenueChange },
+    { title: "Total Users", value: totalUsersCount || 0, change: null },
+    { title: "All Time Revenue", value: formatNumber(totalRevenueAllTime), change: null },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {stats.map((stat, index) => (
+        <div key={index} className={`bg-white p-4 rounded-xl shadow-md ${index !== 0 && "flex gap-2 flex-col"}`}>
+          <div className="text-sm text-gray-500">{stat.title}</div>
+          <div className={`text-xl font-semibold ${index !== 0 && "text-[30px] overflow-y-hidden"}`}>{stat.value}</div>
+          {stat.change && <div className={`text-sm ${stat.change.startsWith("+") ? "text-green-500" : "text-red-500"}`}>{stat.change} than last period</div>}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default Stats;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\components\dashboard-components\TopProductsChart.tsx
+# ==============================================================
+
+import { useAppSelector } from "../../store/hooks";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import type { TopSellingProduct } from "../../types/index";
+
+interface CustomYAxisTickProps { x?: number; y?: number; payload?: { value: string }; }
+interface CustomTooltipProps { active?: boolean; payload?: { payload: TopSellingProduct }[]; }
+
+const CustomYAxisTick = ({ x = 0, y = 0, payload }: CustomYAxisTickProps) => (
+  <foreignObject x={x - 36} y={y - 16} width={32} height={32}>
+    <img src={payload?.value} alt="product" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }} />
+  </foreignObject>
+);
+
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
+  if (active && payload && payload.length > 0) {
+    const product = payload[0].payload;
+    return (
+      <div className="bg-white p-2 rounded shadow border text-sm">
+        <p className="font-semibold">Title: {product.name}</p>
+        <p>Sold: {product.total_sold}</p>
+      </div>
+    );
+  }
+  return null;
+};
+
+const TopProductsChart = () => {
+  const { topSellingProducts } = useAppSelector((state) => state.admin);
+
+  return (
+    <div className="bg-white p-4 rounded-xl shadow-md">
+      <h3 className="font-semibold mb-2">Top Selling Products</h3>
+      <ResponsiveContainer width="100%" height={250}>
+        <BarChart layout="vertical" data={topSellingProducts?.slice(0, 3)} margin={{ top: 0, right: 0, bottom: 0, left: 0 }} barSize={50}>
+          <XAxis type="number" />
+          <YAxis dataKey="image" type="category" tick={<CustomYAxisTick />} width={50} />
+          <Tooltip content={<CustomTooltip />} wrapperStyle={{ pointerEvents: "auto" }} />
+          <Bar dataKey="total_sold" radius={[4, 4, 4, 4]} isAnimationActive={false}>
+            {topSellingProducts?.slice(0, 3).map((_, index) => (
+              <Cell key={`cell-${index}`} fill={index === 0 ? "#3b82f6" : index === 1 ? "#10b981" : "#f59e0b"} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
+export default TopProductsChart;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\components\dashboard-components\TopSellingProducts.tsx
+# ==============================================================
+
+import { useAppSelector } from "../../store/hooks";
+import type { TopSellingProduct } from "../../types/index";
+
+const TopSellingProducts = () => {
+  const { topSellingProducts } = useAppSelector((state) => state.admin);
+
+  return (
+    <div className="bg-white rounded-xl p-6 shadow-md overflow-x-auto xl:col-span-2 max-h-[440px] scrollbar-hide">
+      <h2 className="text-lg font-semibold mb-2">Top Products</h2>
+      <p className="text-sm text-gray-500 mb-4">Products having most sales</p>
+      <table className="min-w-[600px] w-full text-sm text-left">
+        <thead className="bg-gray-100 text-gray-700">
+          <tr>
+            <th className="px-4 py-2">Image</th>
+            <th className="px-4 py-2">Title</th>
+            <th className="px-4 py-2">Category</th>
+            <th className="px-4 py-2">Total Sold</th>
+            <th className="px-4 py-2">Rating</th>
+          </tr>
+        </thead>
+        <tbody>
+          {topSellingProducts.length > 0 && topSellingProducts.map((element: TopSellingProduct, index: number) => (
+            <tr key={index} className="border-b hover:bg-gray-50 transition">
+              <td className="px-4 py-3"><img src={element.image} alt={element.name} className="w-12 h-12 object-cover rounded-md" /></td>
+              <td className="px-4 py-3 font-medium">{element.name}</td>
+              <td className="px-4 py-3 text-gray-600">{element.category}</td>
+              <td className="px-4 py-3 font-semibold">{element.total_sold}</td>
+              <td className="px-4 py-3 text-yellow-500 font-semibold">{element.ratings}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export default TopSellingProducts;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\modals\CreateProductModal.tsx
+# ==============================================================
+
+import { useState } from "react";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { createNewProduct } from "../store/slices/productsSlice";
+import { toggleCreateProductModal } from "../store/slices/extraSlice";
+import { LoaderCircle } from "lucide-react";
+
+const categoryOptions = ["Electronics","Fashion","Home & Garden","Sports","Books","Beauty","Automotive","Kids & Baby"];
+
+const CreateProductModal = () => {
+  const { loading } = useAppSelector((state) => state.product);
+  const dispatch = useAppDispatch();
+  const [formData, setFormData] = useState({ name: "", description: "", price: "", category: "Electronics", stock: "", images: [] as File[] });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = new FormData();
+    data.append("name", formData.name);
+    data.append("description", formData.description);
+    data.append("price", formData.price);
+    data.append("category", formData.category);
+    data.append("stock", formData.stock);
+    formData.images.forEach((img) => data.append("images", img));
+    dispatch(createNewProduct(data));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-xl w-full max-w-2xl p-6 relative">
+        <button onClick={() => dispatch(toggleCreateProductModal())} className="absolute top-4 right-4 text-gray-600 hover:text-red-500 text-xl">&times;</button>
+        <h2 className="text-2xl font-bold mb-4 text-center">Create New Product</h2>
+        <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={handleSubmit}>
+          <input type="text" placeholder="Title" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="border px-4 py-2 rounded" />
+          <select className="w-full border p-2 rounded-lg" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} required>
+            {categoryOptions.map((cat, idx) => <option key={idx} value={cat}>{cat}</option>)}
+          </select>
+          <input type="number" placeholder="Price" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="border px-4 py-2 rounded" />
+          <input type="number" placeholder="Stock" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="border px-4 py-2 rounded" />
+          <input type="file" multiple accept="image/*" onChange={(e) => setFormData({ ...formData, images: Array.from(e.target.files ?? []) })} className="border px-4 py-2 rounded col-span-1 md:col-span-2" />
+          <textarea placeholder="Description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="border px-4 py-2 rounded col-span-1 md:col-span-2" rows={4} />
+          <button type="submit" className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded col-span-1 md:col-span-2">
+            {loading ? <><LoaderCircle className="w-6 h-6 animate-spin" />Creating</> : "Add New Product"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default CreateProductModal;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\modals\UpdateProductModal.tsx
+# ==============================================================
+
+import { useState, useEffect } from "react";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { toggleUpdateProductModal } from "../store/slices/extraSlice";
+import { LoaderCircle } from "lucide-react";
+import { updateProduct } from "../store/slices/productsSlice";
+import type { Product } from "../types/index";
+
+const categoryOptions = ["Electronics","Fashion","Home & Garden","Sports","Books","Beauty","Automotive","Kids & Baby"];
+
+const UpdateProductModal = ({ selectedProduct }: { selectedProduct: Product | null }) => {
+  const { loading } = useAppSelector((state) => state.product);
+  const dispatch = useAppDispatch();
+  const [formData, setFormData] = useState({ name: "", description: "", price: "", category: "", stock: "" });
+
+  useEffect(() => {
+    if (selectedProduct) {
+      setFormData({
+        name: selectedProduct.name || "",
+        description: selectedProduct.description || "",
+        price: String(selectedProduct.price) || "",
+        category: selectedProduct.category || "",
+        stock: String(selectedProduct.stock) || "",
+      });
+    }
+  }, [selectedProduct]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedProduct) dispatch(updateProduct(formData, selectedProduct.id));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-xl w-full max-w-2xl p-6 relative">
+        <button onClick={() => dispatch(toggleUpdateProductModal())} className="absolute top-4 right-4 text-gray-600 hover:text-red-500 text-xl">&times;</button>
+        <h2 className="text-2xl font-bold mb-4 text-center">Update Product</h2>
+        <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={handleSubmit}>
+          <input type="text" placeholder="Title" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="border px-4 py-2 rounded" />
+          <select className="w-full border p-2 rounded-lg" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} required>
+            {categoryOptions.map((cat, idx) => <option key={idx} value={cat}>{cat}</option>)}
+          </select>
+          <input type="number" placeholder="Price" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="border px-4 py-2 rounded" />
+          <input type="number" placeholder="Stock" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="border px-4 py-2 rounded" />
+          <textarea placeholder="Description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="border px-4 py-2 rounded col-span-1 md:col-span-2" rows={4} />
+          <button type="submit" className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-2 px-6 rounded col-span-1 md:col-span-2">
+            {loading ? <><LoaderCircle className="w-6 h-6 animate-spin" />Updating</> : "Update Product"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default UpdateProductModal;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\modals\ViewProductModal.tsx
+# ==============================================================
+
+import { useAppDispatch } from "../store/hooks";
+import { toggleViewProductModal } from "../store/slices/extraSlice";
+import type { Product } from "../types/index";
+
+const ViewProductModal = ({ selectedProduct }: { selectedProduct: Product | null }) => {
+  const dispatch = useAppDispatch();
+  if (!selectedProduct) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-xl w-full max-w-3xl p-6 overflow-y-auto max-h-[90vh] relative">
+        <button onClick={() => dispatch(toggleViewProductModal())} className="absolute top-4 right-4 text-gray-600 hover:text-red-500 text-xl">&times;</button>
+        <h2 className="text-2xl font-bold mb-4">{selectedProduct.name}</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            {selectedProduct.images.map((img, idx) => (
+              <img key={idx} src={img?.url} alt={`Product ${idx}`} className="w-full h-full object-cover" />
+            ))}
+          </div>
+          <div>
+            <p><strong>ID:</strong> {selectedProduct.id}</p>
+            <p><strong>Description:</strong> {selectedProduct.description}</p>
+            <p><strong>Category:</strong> {selectedProduct.category}</p>
+            <p><strong>Price:</strong> Rs {selectedProduct.price.toLocaleString()}</p>
+            <p><strong>Ratings:</strong> ⭐ {selectedProduct.ratings}</p>
+            <p><strong>Stock:</strong> {selectedProduct.stock > 0 ? `In Stock (${selectedProduct.stock})` : "Out of Stock"}</p>
+            <p><strong>Created At:</strong> {new Date(selectedProduct.created_at).toLocaleDateString()}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ViewProductModal;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\pages\ForgotPassword.tsx
+# ==============================================================
+
+import { useState } from "react";
+import { Link, Navigate } from "react-router-dom";
+import { forgotPassword } from "../store/slices/authSlice";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+
+const ForgotPassword = () => {
+  const [email, setEmail] = useState("");
+  const dispatch = useAppDispatch();
+  const { user, isAuthenticated, loading } = useAppSelector((state) => state.auth);
+
+  if (isAuthenticated && user?.role === "Admin") return <Navigate to="/" />;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    dispatch(forgotPassword({ email }));
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-100 to-purple-200 px-4">
+      <div className="bg-white shadow-lg rounded-2xl max-w-md w-full p-8 sm:p-10">
+        <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Forgot Password</h2>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="p-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Enter your email</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="example@example.com" className="w-full px-4 py-3 border border-gray-300 rounded-md" />
+          </div>
+          <div className="px-2 flex justify-end items-center text-sm text-gray-500">
+            <Link to="/login" className="text-blue-600 hover:underline">Remember Password?</Link>
+          </div>
+          <div className="px-2">
+            <button type="submit" disabled={loading} className="w-full flex justify-center items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 transition">
+              {loading ? (<><div className="w-5 h-5 border-2 bg-white border-t-transparent rounded-full animate-spin" /><span>Requesting...</span></>) : "Send Reset Link"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default ForgotPassword;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\pages\Login.tsx
+# ==============================================================
+
+import { useState } from "react";
+import { Link, Navigate } from "react-router-dom";
+import { login } from "../store/slices/authSlice";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+
+const Login = () => {
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const dispatch = useAppDispatch();
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+
+  if (isAuthenticated && user?.role === "Admin") return <Navigate to="/" />;
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = new FormData();
+    data.append("email", formData.email);
+    data.append("password", formData.password);
+    dispatch(login(data));
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-100 to-purple-200 px-4">
+      <div className="bg-white shadow-lg rounded-2xl max-w-md w-full p-8 sm:p-10">
+        <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">Welcome Back</h2>
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div className="p-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+            <input type="email" name="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required placeholder="Enter your email" className="w-full px-4 py-3 border border-gray-300 rounded-xl" />
+          </div>
+          <div className="p-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <input type="password" name="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required placeholder="Enter your password" className="w-full px-4 py-3 border border-gray-300 rounded-xl" />
+          </div>
+          <div className="px-2 flex justify-between items-center text-sm text-gray-500">
+            <div className="flex items-center space-x-2">
+              <input type="checkbox" id="remember" className="w-4 h-4" />
+              <label htmlFor="remember">Remember me</label>
+            </div>
+            <Link to="/password/forgot" className="text-blue-600 hover:underline">Forgot Password?</Link>
+          </div>
+          <div className="px-2">
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition">Sign In</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default Login;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\pages\ResetPassword.tsx
+# ==============================================================
+
+import { useState } from "react";
+import { Navigate, useParams } from "react-router-dom";
+import { resetPassword } from "../store/slices/authSlice";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+
+const ResetPassword = () => {
+  const { token } = useParams<{ token: string }>();
+  const [formData, setFormData] = useState({ password: "", confirmPassword: "" });
+  const dispatch = useAppDispatch();
+  const { user, isAuthenticated, loading } = useAppSelector((state) => state.auth);
+
+  if (isAuthenticated && user?.role === "Admin") return <Navigate to="/" />;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = new FormData();
+    data.append("password", formData.password);
+    data.append("confirmPassword", formData.confirmPassword);
+    dispatch(resetPassword(data, token ?? ""));
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-100 to-purple-200 px-4">
+      <div className="bg-white shadow-lg rounded-2xl max-w-md w-full p-8 sm:p-10">
+        <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">Reset Password</h2>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="p-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+            <input type="password" name="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required placeholder="Enter your new password" className="w-full px-4 py-3 border border-gray-300 rounded-md" />
+          </div>
+          <div className="p-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+            <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} required placeholder="Confirm your password" className="w-full px-4 py-3 border border-gray-300 rounded-md" />
+          </div>
+          <div className="px-2">
+            <button type="submit" disabled={loading} className="w-full flex justify-center items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 disabled:opacity-50">
+              {loading ? (<><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>Resetting...</span></>) : "Reset Password"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default ResetPassword;
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\package-lock.json
+# ==============================================================
+
 {
   "name": "code",
   "version": "0.0.0",
@@ -1929,9 +3797,9 @@
       }
     },
     "node_modules/caniuse-lite": {
-      "version": "1.0.30001791",
-      "resolved": "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001791.tgz",
-      "integrity": "sha512-yk0l/YSrOnFZk3UROpDLQD9+kC1l4meK/wed583AXrzoarMGJcbRi2Q4RaUYbKxYAsZ8sWmaSa/DsLmdBeI1vQ==",
+      "version": "1.0.30001710",
+      "resolved": "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001710.tgz",
+      "integrity": "sha512-B5C0I0UmaGqHgo5FuqJ7hBd4L57A4dDD+Xi+XX1nXOoxGeDdY4Ko38qJYOyqznBVJEqON5p8P1x5zRR3+rsnxA==",
       "dev": true,
       "funding": [
         {
@@ -4931,3 +6799,184 @@
     }
   }
 }
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\package.json
+# ==============================================================
+
+{
+  "name": "code",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.11.2",
+    "@stripe/react-stripe-js": "^5.6.0",
+    "@stripe/stripe-js": "^8.8.0",
+    "axios": "^1.13.5",
+    "lucide-react": "^0.487.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hot-toast": "^2.6.0",
+    "react-redux": "^9.2.0",
+    "react-router-dom": "^7.5.0",
+    "react-toastify": "^11.0.5",
+    "recharts": "^2.15.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.21.0",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.21.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.19",
+    "globals": "^15.15.0",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.9.3",
+    "vite": "^6.2.0"
+  }
+}
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\tsconfig.json
+# ==============================================================
+
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true
+  },
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\tsconfig.node.json
+# ==============================================================
+
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "strict": true
+  },
+  "include": ["vite.config.ts"]
+}
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\vercel.json
+# ==============================================================
+
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://shop-mate-backend.vercel.app/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\index.html
+# ==============================================================
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite + React</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\src\index.css
+# ==============================================================
+
+@import url("https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  font-family: "Ubuntu", sans-serif;
+  font-style: normal;
+  /* font-optical-sizing: auto; */
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+#root {
+  background: #f3f3f6;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.recharts-wrapper .recharts-surface:focus,
+.recharts-wrapper .recharts-surface:hover {
+  outline: none !important;
+}
+
+# ==============================================================
+# FILE: ecommerce-dashboard-template\README.md
+# ==============================================================
+
+# React + Vite
+
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+
+Currently, two official plugins are available:
+
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend using TypeScript and enable type-aware lint rules. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+

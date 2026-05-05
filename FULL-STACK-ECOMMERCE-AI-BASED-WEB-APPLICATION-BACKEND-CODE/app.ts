@@ -3,6 +3,8 @@ import { config } from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import fileUpload from "express-fileupload";
+import { v2 as cloudinary } from "cloudinary";
+import os from "os";
 import Stripe from "stripe";
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 import authRouter from "./router/authRoutes.js";
@@ -13,6 +15,13 @@ import { database } from "./database/db.js";
 
 config({ path: "./config/config.env" });
 
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLIENT_NAME,
+  api_key:    process.env.CLOUDINARY_CLIENT_API,
+  api_secret: process.env.CLOUDINARY_CLIENT_SECRET,
+});
+
 const app = express();
 
 app.use(cors({
@@ -20,6 +29,7 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true,
 }));
+
 
 app.post(
   "/api/v1/payment/webhook",
@@ -77,9 +87,16 @@ app.post(
 );
 
 app.use(cookieParser());
-app.use(fileUpload({ useTempFiles: true, tempFileDir: "/tmp/" }));
+
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+
+app.use(fileUpload({
+  useTempFiles: true,
+  tempFileDir: os.tmpdir(),
+}));
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/product", productRouter);

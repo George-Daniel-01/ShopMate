@@ -1,0 +1,4654 @@
+﻿
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\app.ts
+# ==============================================================
+
+import express, { Request, Response } from "express";
+import { config } from "dotenv";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import fileUpload from "express-fileupload";
+import Stripe from "stripe";
+import { errorMiddleware } from "./middlewares/errorMiddleware.js";
+import authRouter from "./router/authRoutes.js";
+import productRouter from "./router/productRoutes.js";
+import adminRouter from "./router/adminRoutes.js";
+import orderRouter from "./router/orderRoutes.js";
+import { database } from "./database/db.js";
+
+config({ path: "./config/config.env" });
+
+const app = express();
+
+app.use(cors({
+  origin: (_origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => callback(null, true),
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true,
+}));
+
+app.post(
+  "/api/v1/payment/webhook",
+  express.raw({ type: "application/json" }),
+  async (req: Request, res: Response) => {
+    const sig = req.headers["stripe-signature"] as string;
+    let event: Stripe.Event;
+
+    try {
+      event = Stripe.webhooks.constructEvent(
+        req.body as Buffer,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET as string
+      );
+    } catch (error) {
+      res.status(400).send(`Webhook Error: ${(error as Error).message}`);
+      return;
+    }
+
+    if (event.type === "payment_intent.succeeded") {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      const clientSecret = paymentIntent.client_secret;
+
+      try {
+        const paymentResult = await database.query(
+          `UPDATE payments SET payment_status = $1 WHERE payment_intent_id = $2 RETURNING *`,
+          ["Paid", clientSecret]
+        );
+        const orderId = paymentResult.rows[0].order_id as string;
+
+        await database.query(
+          `UPDATE orders SET paid_at = NOW() WHERE id = $1`,
+          [orderId]
+        );
+
+        const { rows: orderedItems } = await database.query<{ product_id: string; quantity: number }>(
+          `SELECT product_id, quantity FROM order_items WHERE order_id = $1`,
+          [orderId]
+        );
+
+        for (const item of orderedItems) {
+          await database.query(
+            `UPDATE products SET stock = stock - $1 WHERE id = $2`,
+            [item.quantity, item.product_id]
+          );
+        }
+      } catch {
+        res.status(500).send("Error updating payment/order records.");
+        return;
+      }
+    }
+
+    res.status(200).send({ received: true });
+  }
+);
+
+app.use(cookieParser());
+app.use(fileUpload({ useTempFiles: true, tempFileDir: "/tmp/" }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/product", productRouter);
+app.use("/api/v1/admin", adminRouter);
+app.use("/api/v1/order", orderRouter);
+
+app.use(errorMiddleware);
+
+export default app;
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\server.ts
+# ==============================================================
+
+import dotenv from "dotenv";
+dotenv.config({ path: "./config/config.env" });
+
+import { connectDB } from "./database/db.js";
+import app from "./app.js";
+import { v2 as cloudinary } from "cloudinary";
+import { createTables } from "./utils/createTables.js";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLIENT_NAME,
+  api_key: process.env.CLOUDINARY_CLIENT_API,
+  api_secret: process.env.CLOUDINARY_CLIENT_SECRET,
+});
+
+const start = async (): Promise<void> => {
+  await connectDB();
+  await createTables();
+
+  app.listen(process.env.PORT || 4000, () => {
+    console.log("Server running on port " + (process.env.PORT || 4000));
+  });
+};
+
+start();
+
+export default app;
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\controllers\adminController.ts
+# ==============================================================
+
+import { Request, Response, NextFunction } from "express";
+import ErrorHandler from "../middlewares/errorMiddleware.js";
+import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
+import { database } from "../database/db.js";
+import { v2 as cloudinary } from "cloudinary";
+import { IUser } from "../types/index.js";
+
+export const getAllUsers = catchAsyncErrors(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const page = parseInt(req.query.page as string) || 1;
+    const totalUsersResult = await database.query<{ count: string }>(
+      "SELECT COUNT(*) FROM users WHERE role = $1", ["User"]
+    );
+    const totalUsers = parseInt(totalUsersResult.rows[0].count);
+    const offset = (page - 1) * 10;
+    const users = await database.query<IUser>(
+      "SELECT * FROM users WHERE role = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+      ["User", 10, offset]
+    );
+    res.status(200).json({ success: true, totalUsers, currentPage: page, users: users.rows });
+  }
+);
+
+export const deleteUser = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { id } = req.params;
+    const result = await database.query<IUser>("DELETE FROM users WHERE id = $1 RETURNING *", [id]);
+    if (result.rows.length === 0)
+      return next(new ErrorHandler("User not found", 404));
+    const avatar = result.rows[0].avatar;
+    if (avatar?.public_id) {
+      await cloudinary.uploader.destroy(avatar.public_id);
+    }
+    res.status(200).json({ success: true, message: "User deleted successfully" });
+  }
+);
+
+export const dashboardStats = catchAsyncErrors(
+  async (_req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const today = new Date();
+    const todayDate = today.toISOString().split("T")[0];
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const yesterdayDate = yesterday.toISOString().split("T")[0];
+    const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const currentMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const previousMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const previousMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+
+    const totalRevenueAllTimeQuery = await database.query<{ sum: string }>(
+      `SELECT SUM(total_price) FROM orders WHERE paid_at IS NOT NULL`
+    );
+    const totalRevenueAllTime = parseFloat(totalRevenueAllTimeQuery.rows[0].sum) || 0;
+
+    const totalUsersCountQuery = await database.query<{ count: string }>(
+      `SELECT COUNT(*) FROM users WHERE role = 'User'`
+    );
+    const totalUsersCount = parseInt(totalUsersCountQuery.rows[0].count) || 0;
+
+    const orderStatusCountsQuery = await database.query<{ order_status: string; count: string }>(
+      `SELECT order_status, COUNT(*) FROM orders WHERE paid_at IS NOT NULL GROUP BY order_status`
+    );
+    const orderStatusCounts: Record<string, number> = {
+      Processing: 0, Shipped: 0, Delivered: 0, Cancelled: 0,
+    };
+    orderStatusCountsQuery.rows.forEach((row) => {
+      orderStatusCounts[row.order_status] = parseInt(row.count);
+    });
+
+    const todayRevenueQuery = await database.query<{ sum: string }>(
+      `SELECT SUM(total_price) FROM orders WHERE created_at::date = $1 AND paid_at IS NOT NULL`,
+      [todayDate]
+    );
+    const todayRevenue = parseFloat(todayRevenueQuery.rows[0].sum) || 0;
+
+    const yesterdayRevenueQuery = await database.query<{ sum: string }>(
+      `SELECT SUM(total_price) FROM orders WHERE created_at::date = $1 AND paid_at IS NOT NULL`,
+      [yesterdayDate]
+    );
+    const yesterdayRevenue = parseFloat(yesterdayRevenueQuery.rows[0].sum) || 0;
+
+    const monthlySalesQuery = await database.query<{ month: string; totalsales: string }>(
+      `SELECT TO_CHAR(created_at, 'Mon YYYY') AS month, DATE_TRUNC('month', created_at) as date, SUM(total_price) as totalsales
+       FROM orders WHERE paid_at IS NOT NULL GROUP BY month, date ORDER BY date ASC`
+    );
+    const monthlySales = monthlySalesQuery.rows.map((row) => ({
+      month: row.month,
+      totalsales: parseFloat(row.totalsales) || 0,
+    }));
+
+    const topSellingProductsQuery = await database.query(
+      `SELECT p.name, p.images->0->>'url' AS image, p.category, p.ratings, SUM(oi.quantity) AS total_sold
+       FROM order_items oi JOIN products p ON p.id = oi.product_id JOIN orders o ON o.id = oi.order_id
+       WHERE o.paid_at IS NOT NULL GROUP BY p.name, p.images, p.category, p.ratings
+       ORDER BY total_sold DESC LIMIT 5`
+    );
+
+    const currentMonthSalesQuery = await database.query<{ total: string }>(
+      `SELECT SUM(total_price) AS total FROM orders WHERE paid_at IS NOT NULL AND created_at BETWEEN $1 AND $2`,
+      [currentMonthStart, currentMonthEnd]
+    );
+    const currentMonthSales = parseFloat(currentMonthSalesQuery.rows[0].total) || 0;
+
+    const lowStockProductsQuery = await database.query<{ name: string; stock: number }>(
+      `SELECT name, stock FROM products WHERE stock <= 5`
+    );
+
+    const lastMonthRevenueQuery = await database.query<{ total: string }>(
+      `SELECT SUM(total_price) AS total FROM orders WHERE paid_at IS NOT NULL AND created_at BETWEEN $1 AND $2`,
+      [previousMonthStart, previousMonthEnd]
+    );
+    const lastMonthRevenue = parseFloat(lastMonthRevenueQuery.rows[0].total) || 0;
+
+    let revenueGrowth = "0%";
+    if (lastMonthRevenue > 0) {
+      const growthRate = ((currentMonthSales - lastMonthRevenue) / lastMonthRevenue) * 100;
+      revenueGrowth = `${growthRate >= 0 ? "+" : ""}${growthRate.toFixed(2)}%`;
+    }
+
+    const newUsersThisMonthQuery = await database.query<{ count: string }>(
+      `SELECT COUNT(*) FROM users WHERE created_at >= $1 AND role = 'User'`,
+      [currentMonthStart]
+    );
+    const newUsersThisMonth = parseInt(newUsersThisMonthQuery.rows[0].count) || 0;
+
+    res.status(200).json({
+      success: true,
+      message: "Dashboard Stats Fetched Successfully",
+      totalRevenueAllTime, todayRevenue, yesterdayRevenue, totalUsersCount,
+      orderStatusCounts, monthlySales, currentMonthSales,
+      topSellingProducts: topSellingProductsQuery.rows,
+      lowStockProducts: lowStockProductsQuery.rows,
+      revenueGrowth, newUsersThisMonth,
+    });
+  }
+);
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\controllers\authController.ts
+# ==============================================================
+
+import { Request, Response, NextFunction } from "express";
+import ErrorHandler from "../middlewares/errorMiddleware.js";
+import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
+import { database } from "../database/db.js";
+import bcrypt from "bcrypt";
+import { sendToken } from "../utils/jwtToken.js";
+import { generateResetPasswordToken } from "../utils/generateResetPasswordToken.js";
+import { generateEmailTemplate } from "../utils/generateForgotPasswordEmailTemplate.js";
+import { sendEmail } from "../utils/sendEmail.js";
+import crypto from "crypto";
+import { v2 as cloudinary } from "cloudinary";
+import { IUser } from "../types/index.js";
+
+export const register = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { name, email, password } = req.body as {
+      name: string; email: string; password: string;
+    };
+    if (!name || !email || !password)
+      return next(new ErrorHandler("Please provide all required fields.", 400));
+    if (password.length < 8 || password.length > 16)
+      return next(new ErrorHandler("Password must be between 8 and 16 characters.", 400));
+    const existing = await database.query<IUser>(`SELECT * FROM users WHERE email = $1`, [email]);
+    if (existing.rows.length > 0)
+      return next(new ErrorHandler("User already registered with this email.", 400));
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await database.query<IUser>(
+      "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *",
+      [name, email, hashedPassword]
+    );
+    sendToken(user.rows[0], 201, "User registered successfully", res);
+  }
+);
+
+export const login = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { email, password } = req.body as { email: string; password: string };
+    if (!email || !password)
+      return next(new ErrorHandler("Please provide email and password.", 400));
+    const user = await database.query<IUser>(`SELECT * FROM users WHERE email = $1`, [email]);
+    if (user.rows.length === 0)
+      return next(new ErrorHandler("Invalid email or password.", 401));
+    const isPasswordMatch = await bcrypt.compare(password, user.rows[0].password);
+    if (!isPasswordMatch)
+      return next(new ErrorHandler("Invalid email or password.", 401));
+    sendToken(user.rows[0], 200, "Logged In.", res);
+  }
+);
+
+export const getUser = catchAsyncErrors(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    res.status(200).json({ success: true, user: req.user });
+  }
+);
+
+export const logout = catchAsyncErrors(
+  async (_req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    res
+      .status(200)
+      .cookie("token", "", {
+        expires: new Date(Date.now()),
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+      })
+      .json({ success: true, message: "Logged out successfully." });
+  }
+);
+
+export const forgotPassword = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { email } = req.body as { email: string };
+    const { frontendUrl } = req.query as { frontendUrl: string };
+    const userResult = await database.query<IUser>(`SELECT * FROM users WHERE email = $1`, [email]);
+    if (userResult.rows.length === 0)
+      return next(new ErrorHandler("User not found with this email.", 404));
+    const user = userResult.rows[0];
+    const { hashedToken, resetPasswordExpireTime, resetToken } = generateResetPasswordToken();
+    await database.query(
+      `UPDATE users SET reset_password_token = $1, reset_password_expire = to_timestamp($2) WHERE email = $3`,
+      [hashedToken, resetPasswordExpireTime / 1000, email]
+    );
+    const resetPasswordUrl = `${frontendUrl}/password/reset/${resetToken}`;
+    const message = generateEmailTemplate(resetPasswordUrl);
+    try {
+      await sendEmail({ email: user.email, subject: "Ecommerce Password Recovery", message });
+      res.status(200).json({ success: true, message: `Email sent to ${user.email} successfully.` });
+    } catch {
+      await database.query(
+        `UPDATE users SET reset_password_token = NULL, reset_password_expire = NULL WHERE email = $1`,
+        [email]
+      );
+      return next(new ErrorHandler("Email could not be sent.", 500));
+    }
+  }
+);
+
+export const resetPassword = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { token } = req.params as { token: string };
+    const { password, confirmPassword } = req.body as {
+      password: string; confirmPassword: string;
+    };
+    const resetPasswordToken = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await database.query<IUser>(
+      "SELECT * FROM users WHERE reset_password_token = $1 AND reset_password_expire > NOW()",
+      [resetPasswordToken]
+    );
+    if (user.rows.length === 0)
+      return next(new ErrorHandler("Invalid or expired reset token.", 400));
+    if (password !== confirmPassword)
+      return next(new ErrorHandler("Passwords do not match.", 400));
+    if (password.length < 8 || password.length > 16)
+      return next(new ErrorHandler("Password must be between 8 and 16 characters.", 400));
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const updatedUser = await database.query<IUser>(
+      `UPDATE users SET password = $1, reset_password_token = NULL, reset_password_expire = NULL WHERE id = $2 RETURNING *`,
+      [hashedPassword, user.rows[0].id]
+    );
+    sendToken(updatedUser.rows[0], 200, "Password reset successfully", res);
+  }
+);
+
+export const updatePassword = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { currentPassword, newPassword, confirmNewPassword } = req.body as {
+      currentPassword: string; newPassword: string; confirmNewPassword: string;
+    };
+    if (!currentPassword || !newPassword || !confirmNewPassword)
+      return next(new ErrorHandler("Please provide all required fields.", 400));
+    const isPasswordMatch = await bcrypt.compare(currentPassword, req.user.password);
+    if (!isPasswordMatch)
+      return next(new ErrorHandler("Current password is incorrect.", 401));
+    if (newPassword !== confirmNewPassword)
+      return next(new ErrorHandler("New passwords do not match.", 400));
+    if (newPassword.length < 8 || newPassword.length > 16)
+      return next(new ErrorHandler("Password must be between 8 and 16 characters.", 400));
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await database.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, req.user.id]);
+    res.status(200).json({ success: true, message: "Password updated successfully." });
+  }
+);
+
+export const updateProfile = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { name, email } = req.body as { name: string; email: string };
+    if (!name || !email)
+      return next(new ErrorHandler("Please provide all required fields.", 400));
+    if (!name.trim() || !email.trim())
+      return next(new ErrorHandler("Name and email cannot be empty.", 400));
+    let avatarData: { public_id?: string; url?: string } = {};
+    if (req.files && req.files.avatar) {
+      const avatar = req.files.avatar as any;
+      if (req.user?.avatar?.public_id) {
+        await cloudinary.uploader.destroy(req.user.avatar.public_id);
+      }
+      const newProfileImage = await cloudinary.uploader.upload(avatar.tempFilePath, {
+        folder: "Ecommerce_Avatars", width: 150, crop: "scale",
+      });
+      avatarData = { public_id: newProfileImage.public_id, url: newProfileImage.secure_url };
+    }
+    let user;
+    if (Object.keys(avatarData).length === 0) {
+      user = await database.query<IUser>(
+        "UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING *",
+        [name, email, req.user.id]
+      );
+    } else {
+      user = await database.query<IUser>(
+        "UPDATE users SET name = $1, email = $2, avatar = $3 WHERE id = $4 RETURNING *",
+        [name, email, avatarData, req.user.id]
+      );
+    }
+    res.status(200).json({ success: true, message: "Profile updated successfully.", user: user.rows[0] });
+  }
+);
+
+export const registerAdmin = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { name, email, password, adminSecretKey } = req.body as {
+      name: string; email: string; password: string; adminSecretKey: string;
+    };
+    if (adminSecretKey !== process.env.ADMIN_SECRET_KEY)
+      return next(new ErrorHandler("Invalid admin secret key.", 403));
+    if (!name || !email || !password)
+      return next(new ErrorHandler("Please provide all required fields.", 400));
+    if (password.length < 8 || password.length > 16)
+      return next(new ErrorHandler("Password must be between 8 and 16 characters.", 400));
+    const existing = await database.query<IUser>(`SELECT * FROM users WHERE email = $1`, [email]);
+    if (existing.rows.length > 0)
+      return next(new ErrorHandler("User already registered with this email.", 400));
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await database.query<IUser>(
+      "INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, 'Admin') RETURNING *",
+      [name, email, hashedPassword]
+    );
+    sendToken(user.rows[0], 201, "Admin registered successfully", res);
+  }
+);
+
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\controllers\orderController.ts
+# ==============================================================
+
+import { Request, Response, NextFunction } from "express";
+import ErrorHandler from "../middlewares/errorMiddleware.js";
+import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
+import { database } from "../database/db.js";
+import { generatePaymentIntent } from "../utils/generatePaymentIntent.js";
+import { ICartItem } from "../types/index.js";
+
+export const placeNewOrder = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { full_name, state, city, country, address, pincode, phone, orderedItems } =
+      req.body as {
+        full_name: string; state: string; city: string; country: string;
+        address: string; pincode: string; phone: string;
+        orderedItems: ICartItem[] | string;
+      };
+
+    if (!full_name || !state || !city || !country || !address || !pincode || !phone)
+      return next(new ErrorHandler("Please provide complete shipping details.", 400));
+
+    const items: ICartItem[] = Array.isArray(orderedItems)
+      ? orderedItems
+      : JSON.parse(orderedItems as string);
+
+    if (!items || items.length === 0)
+      return next(new ErrorHandler("No items in cart.", 400));
+
+    const productIds = items.map((item) => item.product.id);
+    const { rows: products } = await database.query<{
+      id: string; price: number; stock: number; name: string;
+    }>(`SELECT id, price, stock, name FROM products WHERE id = ANY($1::uuid[])`, [productIds]);
+
+    let total_price = 0;
+    const values: (string | number | null)[] = [];
+    const placeholders: string[] = [];
+
+    items.forEach((item, index) => {
+      const product = products.find((p) => p.id === item.product.id);
+      if (!product) {
+        next(new ErrorHandler(`Product not found for ID: ${item.product.id}`, 404));
+        return;
+      }
+      if (item.quantity > product.stock) {
+        next(new ErrorHandler(`Only ${product.stock} units available for ${product.name}`, 400));
+        return;
+      }
+      total_price += product.price * item.quantity;
+      values.push(null, product.id, item.quantity, product.price, item.product.images[0]?.url ?? "", product.name);
+      const offset = index * 6;
+      placeholders.push(
+        `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6})`
+      );
+    });
+
+    const tax_price = 0.18;
+    const shipping_price = total_price >= 50 ? 0 : 2;
+    total_price = Math.round(total_price + total_price * tax_price + shipping_price);
+
+    const orderResult = await database.query<{ id: string }>(
+      `INSERT INTO orders (buyer_id, total_price, tax_price, shipping_price) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [req.user.id, total_price, tax_price, shipping_price]
+    );
+    const orderId = orderResult.rows[0].id;
+
+    for (let i = 0; i < values.length; i += 6) values[i] = orderId;
+
+    await database.query(
+      `INSERT INTO order_items (order_id, product_id, quantity, price, image, title) VALUES ${placeholders.join(", ")} RETURNING *`,
+      values
+    );
+    await database.query(
+      `INSERT INTO shipping_info (order_id, full_name, state, city, country, address, pincode, phone) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [orderId, full_name, state, city, country, address, pincode, phone]
+    );
+
+    const paymentResponse = await generatePaymentIntent(orderId, total_price);
+    if (!paymentResponse.success)
+      return next(new ErrorHandler("Payment failed. Try again.", 500));
+
+    res.status(200).json({
+      success: true, message: "Order placed successfully. Please proceed to payment.",
+      orderId, paymentIntent: paymentResponse.clientSecret, total_price,
+    });
+  }
+);
+
+export const fetchSingleOrder = catchAsyncErrors(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const { orderId } = req.params;
+    const result = await database.query(
+      `SELECT o.*,
+        COALESCE(json_agg(json_build_object(
+          'order_item_id', oi.id, 'order_id', oi.order_id,
+          'product_id', oi.product_id, 'quantity', oi.quantity, 'price', oi.price
+        )) FILTER (WHERE oi.id IS NOT NULL), '[]') AS order_items,
+        json_build_object(
+          'full_name', s.full_name, 'state', s.state, 'city', s.city,
+          'country', s.country, 'address', s.address, 'pincode', s.pincode, 'phone', s.phone
+        ) AS shipping_info
+       FROM orders o
+       LEFT JOIN order_items oi ON o.id = oi.order_id
+       LEFT JOIN shipping_info s ON o.id = s.order_id
+       WHERE o.id = $1 GROUP BY o.id, s.id;`,
+      [orderId]
+    );
+    res.status(200).json({ success: true, message: "Order fetched.", orders: result.rows[0] });
+  }
+);
+
+export const fetchMyOrders = catchAsyncErrors(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const result = await database.query(
+      `SELECT o.*,
+        COALESCE(json_agg(json_build_object(
+          'order_item_id', oi.id, 'order_id', oi.order_id, 'product_id', oi.product_id,
+          'quantity', oi.quantity, 'price', oi.price, 'image', oi.image, 'title', oi.title
+        )) FILTER (WHERE oi.id IS NOT NULL), '[]') AS order_items,
+        json_build_object(
+          'full_name', s.full_name, 'state', s.state, 'city', s.city,
+          'country', s.country, 'address', s.address, 'pincode', s.pincode, 'phone', s.phone
+        ) AS shipping_info
+       FROM orders o
+       LEFT JOIN order_items oi ON o.id = oi.order_id
+       LEFT JOIN shipping_info s ON o.id = s.order_id
+       WHERE o.buyer_id = $1 GROUP BY o.id, s.id ORDER BY o.created_at DESC`,
+      [req.user.id]
+    );
+    res.status(200).json({ success: true, message: "All your orders are fetched.", myOrders: result.rows });
+  }
+);
+
+export const fetchAllOrders = catchAsyncErrors(
+  async (_req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const result = await database.query(
+      `SELECT o.*,
+        COALESCE(json_agg(json_build_object(
+          'order_item_id', oi.id, 'order_id', oi.order_id, 'product_id', oi.product_id,
+          'quantity', oi.quantity, 'price', oi.price, 'image', oi.image, 'title', oi.title
+        )) FILTER (WHERE oi.id IS NOT NULL), '[]') AS order_items,
+        json_build_object(
+          'full_name', s.full_name, 'state', s.state, 'city', s.city,
+          'country', s.country, 'address', s.address, 'pincode', s.pincode, 'phone', s.phone
+        ) AS shipping_info
+       FROM orders o
+       LEFT JOIN order_items oi ON o.id = oi.order_id
+       LEFT JOIN shipping_info s ON o.id = s.order_id
+       GROUP BY o.id, s.id ORDER BY o.created_at DESC`
+    );
+    res.status(200).json({ success: true, message: "All orders fetched.", orders: result.rows });
+  }
+);
+
+export const updateOrderStatus = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { status } = req.body as { status: string };
+    const { orderId } = req.params;
+    if (!status) return next(new ErrorHandler("Provide a valid status for order.", 400));
+    const results = await database.query(`SELECT * FROM orders WHERE id = $1`, [orderId]);
+    if (results.rows.length === 0) return next(new ErrorHandler("Invalid order ID.", 404));
+    const updatedOrder = await database.query(
+      `UPDATE orders SET order_status = $1 WHERE id = $2 RETURNING *`, [status, orderId]
+    );
+    res.status(200).json({ success: true, message: "Order status updated.", updatedOrder: updatedOrder.rows[0] });
+  }
+);
+
+export const deleteOrder = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { orderId } = req.params;
+    const results = await database.query(`DELETE FROM orders WHERE id = $1 RETURNING *`, [orderId]);
+    if (results.rows.length === 0) return next(new ErrorHandler("Invalid order ID.", 404));
+    res.status(200).json({ success: true, message: "Order deleted.", order: results.rows[0] });
+  }
+);
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\controllers\productController.ts
+# ==============================================================
+
+import { Request, Response, NextFunction } from "express";
+import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
+import ErrorHandler from "../middlewares/errorMiddleware.js";
+import { v2 as cloudinary } from "cloudinary";
+import { database } from "../database/db.js";
+import { getAIRecommendation } from "../utils/getAIRecommendation.js";
+import { IProduct, IProductImage } from "../types/index.js";
+
+export const createProduct = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { name, description, price, category, stock } = req.body as {
+      name: string; description: string; price: string; category: string; stock: string;
+    };
+    const created_by = req.user.id;
+    if (!name || !description || !price || !category || !stock)
+      return next(new ErrorHandler("Please provide complete product details.", 400));
+
+    const uploadedImages: IProductImage[] = [];
+    if (req.files?.images) {
+      const images = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
+      for (const image of images) {
+        const result = await cloudinary.uploader.upload((image as any).tempFilePath, {
+          folder: "Ecommerce_Product_Images", width: 1000, crop: "scale",
+        });
+        uploadedImages.push({ url: result.secure_url, public_id: result.public_id });
+      }
+    }
+    const product = await database.query<IProduct>(
+      `INSERT INTO products (name, description, price, category, stock, images, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [name, description, parseFloat(price) / 283, category, stock, JSON.stringify(uploadedImages), created_by]
+    );
+    res.status(201).json({ success: true, message: "Product created successfully.", product: product.rows[0] });
+  }
+);
+
+export const fetchAllProducts = catchAsyncErrors(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const { availability, price, category, ratings, search } = req.query as Record<string, string>;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = 10;
+    const offset = (page - 1) * limit;
+
+    const conditions: string[] = [];
+    const values: (string | number)[] = [];
+    let index = 1;
+
+    if (availability === "in-stock") conditions.push(`stock > 5`);
+    else if (availability === "limited") conditions.push(`stock > 0 AND stock <= 5`);
+    else if (availability === "out-of-stock") conditions.push(`stock = 0`);
+
+    if (price) {
+      const [minPrice, maxPrice] = price.split("-");
+      if (minPrice && maxPrice) {
+        conditions.push(`price BETWEEN $${index} AND $${index + 1}`);
+        values.push(minPrice, maxPrice); index += 2;
+      }
+    }
+    if (category) { conditions.push(`category ILIKE $${index}`); values.push(`%${category}%`); index++; }
+    if (ratings) { conditions.push(`ratings >= $${index}`); values.push(ratings); index++; }
+    if (search) { conditions.push(`(p.name ILIKE $${index} OR p.description ILIKE $${index})`); values.push(`%${search}%`); index++; }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const totalProductsResult = await database.query<{ count: string }>(
+      `SELECT COUNT(*) FROM products p ${whereClause}`, values
+    );
+    const totalProducts = parseInt(totalProductsResult.rows[0].count);
+
+    const limitPlaceholder = `$${index}`; values.push(limit); index++;
+    const offsetPlaceholder = `$${index}`; values.push(offset);
+
+    const result = await database.query(
+      `SELECT p.*, COUNT(r.id) AS review_count FROM products p LEFT JOIN reviews r ON p.id = r.product_id ${whereClause} GROUP BY p.id ORDER BY p.created_at DESC LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
+      values
+    );
+    const newProductsResult = await database.query(
+      `SELECT p.*, COUNT(r.id) AS review_count FROM products p LEFT JOIN reviews r ON p.id = r.product_id WHERE p.created_at >= NOW() - INTERVAL '30 days' GROUP BY p.id ORDER BY p.created_at DESC LIMIT 8`
+    );
+    const topRatedResult = await database.query(
+      `SELECT p.*, COUNT(r.id) AS review_count FROM products p LEFT JOIN reviews r ON p.id = r.product_id WHERE p.ratings >= 4.5 GROUP BY p.id ORDER BY p.ratings DESC, p.created_at DESC LIMIT 8`
+    );
+
+    res.status(200).json({
+      success: true, products: result.rows, totalProducts,
+      newProducts: newProductsResult.rows, topRatedProducts: topRatedResult.rows,
+    });
+  }
+);
+
+export const updateProduct = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { productId } = req.params;
+    const product = await database.query<IProduct>("SELECT * FROM products WHERE id = $1", [productId]);
+    if (product.rows.length === 0) return next(new ErrorHandler("Product not found.", 404));
+    const existingProduct = product.rows[0];
+    const bodyFields = (req.body ?? {}) as Record<string, string>;
+    const hasBodyData = Object.keys(bodyFields).length > 0 &&
+      Object.values(bodyFields).some((v) => v?.toString().trim() !== "");
+    const hasFiles = req.files?.images;
+
+    if (!hasBodyData && !hasFiles) {
+      res.status(200).json({ success: true, message: "Product details fetched for update.", product: existingProduct });
+      return;
+    }
+
+    const updates: Record<string, string | number> = {};
+    const name = bodyFields.name?.trim();
+    const description = bodyFields.description?.trim();
+    const price = bodyFields.price ? parseFloat(bodyFields.price) : null;
+    const category = bodyFields.category?.trim();
+    const stock = bodyFields.stock ? parseInt(bodyFields.stock) : null;
+
+    if (name) updates.name = name;
+    if (description) updates.description = description;
+    if (price && !isNaN(price)) updates.price = price / 283;
+    if (category) updates.category = category;
+    if (stock && !isNaN(stock)) updates.stock = stock;
+
+    let uploadedImages: IProductImage[] = existingProduct.images ?? [];
+    if (hasFiles) {
+      if (existingProduct.images?.length > 0) {
+        for (const img of existingProduct.images) await cloudinary.uploader.destroy(img.public_id);
+      }
+      const images = Array.isArray(req.files!.images) ? req.files!.images : [req.files!.images];
+      uploadedImages = [];
+      for (const image of images) {
+        const result = await cloudinary.uploader.upload((image as any).tempFilePath, {
+          folder: "Ecommerce_Product_Images", width: 1000, crop: "scale",
+        });
+        uploadedImages.push({ url: result.secure_url, public_id: result.public_id });
+      }
+    }
+
+    const fields = [...Object.keys(updates), "images"];
+    const vals: unknown[] = [...Object.values(updates), JSON.stringify(uploadedImages), productId];
+    const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(", ");
+    const result = await database.query<IProduct>(
+      `UPDATE products SET ${setClause} WHERE id = $${vals.length} RETURNING *`, vals
+    );
+    res.status(200).json({ success: true, message: "Product updated successfully.", updatedProduct: result.rows[0] });
+  }
+);
+
+export const deleteProduct = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { productId } = req.params;
+    const product = await database.query<IProduct>("SELECT * FROM products WHERE id = $1", [productId]);
+    if (product.rows.length === 0) return next(new ErrorHandler("Product not found.", 404));
+    const deleteResult = await database.query("DELETE FROM products WHERE id = $1 RETURNING *", [productId]);
+    if (deleteResult.rows.length === 0) return next(new ErrorHandler("Failed to delete product.", 500));
+    for (const image of product.rows[0].images ?? []) {
+      await cloudinary.uploader.destroy(image.public_id);
+    }
+    res.status(200).json({ success: true, message: "Product deleted successfully." });
+  }
+);
+
+export const fetchSingleProduct = catchAsyncErrors(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const { productId } = req.params;
+    const result = await database.query(
+      `SELECT p.*,
+        COALESCE(json_agg(json_build_object(
+          'review_id', r.id, 'rating', r.rating, 'comment', r.comment,
+          'reviewer', json_build_object('id', u.id, 'name', u.name, 'avatar', u.avatar)
+        )) FILTER (WHERE r.id IS NOT NULL), '[]') AS reviews
+       FROM products p
+       LEFT JOIN reviews r ON p.id = r.product_id
+       LEFT JOIN users u ON r.user_id = u.id
+       WHERE p.id = $1 GROUP BY p.id`,
+      [productId]
+    );
+    res.status(200).json({ success: true, message: "Product fetched successfully.", product: result.rows[0] });
+  }
+);
+
+export const postProductReview = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { productId } = req.params;
+    const { rating, comment } = req.body as { rating: number; comment: string };
+    if (!rating || !comment) return next(new ErrorHandler("Please provide rating and comment.", 400));
+
+    const { rows } = await database.query(
+      `SELECT oi.product_id FROM order_items oi JOIN orders o ON o.id = oi.order_id
+       WHERE o.buyer_id = $1 AND oi.product_id = $2 AND o.order_status = 'Delivered' LIMIT 1`,
+      [req.user.id, productId]
+    );
+    if (rows.length === 0) {
+      res.status(403).json({ success: false, message: "You can only review a product you've purchased." });
+      return;
+    }
+
+    const product = await database.query("SELECT * FROM products WHERE id = $1", [productId]);
+    if (product.rows.length === 0) return next(new ErrorHandler("Product not found.", 404));
+
+    const isAlreadyReviewed = await database.query(
+      `SELECT * FROM reviews WHERE product_id = $1 AND user_id = $2`, [productId, req.user.id]
+    );
+    let review;
+    if (isAlreadyReviewed.rows.length > 0) {
+      review = await database.query(
+        "UPDATE reviews SET rating = $1, comment = $2 WHERE product_id = $3 AND user_id = $4 RETURNING *",
+        [rating, comment, productId, req.user.id]
+      );
+    } else {
+      review = await database.query(
+        "INSERT INTO reviews (product_id, user_id, rating, comment) VALUES ($1, $2, $3, $4) RETURNING *",
+        [productId, req.user.id, rating, comment]
+      );
+    }
+    const allReviews = await database.query<{ avg_rating: string }>(
+      `SELECT AVG(rating) AS avg_rating FROM reviews WHERE product_id = $1`, [productId]
+    );
+    const updatedProduct = await database.query(
+      `UPDATE products SET ratings = $1 WHERE id = $2 RETURNING *`,
+      [allReviews.rows[0].avg_rating, productId]
+    );
+    res.status(200).json({ success: true, message: "Review posted.", review: review.rows[0], product: updatedProduct.rows[0] });
+  }
+);
+
+export const deleteReview = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { productId } = req.params;
+    const review = await database.query(
+      "DELETE FROM reviews WHERE product_id = $1 AND user_id = $2 RETURNING *",
+      [productId, req.user.id]
+    );
+    if (review.rows.length === 0) return next(new ErrorHandler("Review not found.", 404));
+    const allReviews = await database.query<{ avg_rating: string }>(
+      `SELECT AVG(rating) AS avg_rating FROM reviews WHERE product_id = $1`, [productId]
+    );
+    const updatedProduct = await database.query(
+      `UPDATE products SET ratings = $1 WHERE id = $2 RETURNING *`,
+      [allReviews.rows[0].avg_rating, productId]
+    );
+    res.status(200).json({ success: true, message: "Your review has been deleted.", review: review.rows[0], product: updatedProduct.rows[0] });
+  }
+);
+
+export const fetchAIFilteredProducts = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { userPrompt } = req.body as { userPrompt: string };
+    if (!userPrompt) return next(new ErrorHandler("Provide a valid prompt.", 400));
+
+    const stopWords = new Set(["the","they","them","then","I","we","you","he","she","it","is","a","an","of","and","or","to","for","from","on","who","whom","why","when","which","with","this","that","in","at","by","be","not","was","were","has","have","had","do","does","did","so","some","any","how","can","could","should","would","there","here","just","than","because","but","its","it's","if",".",",","!","?",">","<",";","`","1","2","3","4","5","6","7","8","9","10"]);
+    const keywords = userPrompt
+      .toLowerCase()
+      .replace(/[^\w\s]/g, "")
+      .split(/\s+/)
+      .filter((w) => !stopWords.has(w))
+      .map((w) => `%${w}%`);
+
+    const result = await database.query<IProduct>(
+      `SELECT * FROM products WHERE name ILIKE ANY($1) OR description ILIKE ANY($1) OR category ILIKE ANY($1) LIMIT 200;`,
+      [keywords]
+    );
+    const filteredProducts = result.rows;
+
+    if (filteredProducts.length === 0) {
+      res.status(200).json({ success: true, message: "No products found matching your prompt.", products: [] });
+      return;
+    }
+
+    const aiResult = await getAIRecommendation(req, userPrompt, filteredProducts);
+    if (!aiResult.success) {
+      res.status(500).json({ success: false, message: aiResult.message });
+      return;
+    }
+    if (!Array.isArray(aiResult.products)) {
+      res.status(200).json({ success: true, message: "AI returned invalid format, showing all matching products.", products: filteredProducts });
+      return;
+    }
+    res.status(200).json({ success: true, message: "AI filtered products.", products: aiResult.products });
+  }
+);
+
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\database\db.ts
+# ==============================================================
+
+import dns from "dns";
+dns.setDefaultResultOrder("ipv4first");
+
+import pkg from "pg";
+import dotenv from "dotenv";
+dotenv.config({ path: "./config/config.env" });
+
+const { Pool } = pkg;
+
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+export const database = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 1,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 10000,
+  family: 4,
+});
+
+export const connectDB = async (): Promise<void> => {
+  try {
+    await database.query("SELECT 1");
+    console.log("Connected to PostgreSQL successfully");
+  } catch (error) {
+    console.error("Database connection failed:", (error as Error).message);
+    process.exit(1);
+  }
+};
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\middlewares\authMiddleware.ts
+# ==============================================================
+
+import { Request, Response, NextFunction } from "express";
+import jwt, { JwtPayload } from "jsonwebtoken";
+import { catchAsyncErrors } from "./catchAsyncError.js";
+import ErrorHandler from "./errorMiddleware.js";
+import { database } from "../database/db.js";
+import { IUser } from "../types/index.js";
+
+declare global {
+  namespace Express {
+    interface Request {
+      user: IUser;
+    }
+  }
+}
+
+interface DecodedToken extends JwtPayload {
+  id: string;
+}
+
+export const isAuthenticated = catchAsyncErrors(
+  async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+    const token =
+      req.cookies?.token ||
+      req.headers?.authorization?.replace("Bearer ", "");
+
+    if (!token) {
+      return next(new ErrorHandler("Please login to access this resource.", 401));
+    }
+
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET_KEY as string
+    ) as DecodedToken;
+
+    const user = await database.query<IUser>(
+      "SELECT * FROM users WHERE id = $1 LIMIT 1",
+      [decoded.id]
+    );
+
+    if (user.rows.length === 0) {
+      return next(new ErrorHandler("User not found.", 404));
+    }
+
+    req.user = user.rows[0];
+    next();
+  }
+);
+
+export const authorizedRoles = (...roles: string[]) => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    if (!roles.includes(req.user.role)) {
+      return next(
+        new ErrorHandler(
+          `Role: ${req.user.role} is not allowed to access this resource.`,
+          403
+        )
+      );
+    }
+    next();
+  };
+};
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\middlewares\catchAsyncError.ts
+# ==============================================================
+
+import { Request, Response, NextFunction } from "express";
+
+type AsyncHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => Promise<void | Response>;
+
+export const catchAsyncErrors = (theFunction: AsyncHandler) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    Promise.resolve(theFunction(req, res, next)).catch(next);
+  };
+};
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\middlewares\errorMiddleware.ts
+# ==============================================================
+
+import { Request, Response, NextFunction } from "express";
+
+class ErrorHandler extends Error {
+  public statusCode: number;
+
+  constructor(message: string, statusCode: number) {
+    super(message);
+    this.statusCode = statusCode;
+    Object.setPrototypeOf(this, ErrorHandler.prototype);
+  }
+}
+
+export const errorMiddleware = (
+  err: ErrorHandler,
+  _req: Request,
+  res: Response,
+  _next: NextFunction
+): void => {
+  err.message = err.message || "Internal Server Error";
+  err.statusCode = err.statusCode || 500;
+
+  if ((err as any).code === 11000) {
+    err = new ErrorHandler("Duplicate field value entered", 400);
+  }
+  if (err.name === "JsonWebTokenError") {
+    err = new ErrorHandler("JSON Web Token is invalid, try again", 400);
+  }
+  if (err.name === "TokenExpiredError") {
+    err = new ErrorHandler("JSON Web Token has expired, try again", 400);
+  }
+  if (err.name === "CastError") {
+    err = new ErrorHandler(`Invalid ${(err as any).path}: ${(err as any).value}`, 400);
+  }
+
+  const errorMessage: string =
+    (err as any).errors
+      ? Object.values((err as any).errors)
+          .map((e: any) => e.message)
+          .join(" ")
+      : err.message;
+
+  res.status(err.statusCode).json({
+    success: false,
+    message: errorMessage,
+  });
+};
+
+export default ErrorHandler;
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\models\orderItemsTable.ts
+# ==============================================================
+
+
+import { database } from "../database/db.js"; // ✅ Named import
+
+export async function createOrderItemTable() {
+  try {
+    const query = `
+      CREATE TABLE IF NOT EXISTS order_items (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        order_id UUID NOT NULL,
+        product_id UUID NOT NULL,
+        quantity INT NOT NULL CHECK (quantity > 0),
+        price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
+        image TEXT NOT NULL,
+        title TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      );
+    `;
+    await database.query(query);
+    console.log("✅ Order items table created or already exists");
+  } catch (error) {
+    console.error("❌ Failed To Create Order Items Table.", error);
+    process.exit(1);
+  }
+}
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\models\ordersTable.ts
+# ==============================================================
+
+import { database } from "../database/db.js";
+
+export async function createOrdersTable() {
+  try {
+    const query = `
+      CREATE TABLE IF NOT EXISTS orders (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        buyer_id UUID NOT NULL,
+        total_price DECIMAL(10,2) NOT NULL CHECK (total_price >= 0),
+        tax_price DECIMAL(10,2) NOT NULL DEFAULT 0,
+        shipping_price DECIMAL(10,2) NOT NULL DEFAULT 0,
+        order_status VARCHAR(20) DEFAULT 'Processing' CHECK (order_status IN ('Processing', 'Shipped', 'Delivered', 'Cancelled')),
+        paid_at TIMESTAMP DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+    `;
+    await database.query(query);
+    console.log("✅ Orders table created or already exists");
+  } catch (error) {
+    console.error("❌ Failed To Create Orders Table.", error);
+    process.exit(1);
+  }
+}
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\models\paymentsTable.ts
+# ==============================================================
+
+import {database} from "../database/db.js";
+export async function createPaymentsTable() {
+  try {
+    const query = `CREATE TABLE IF NOT EXISTS payments (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        order_id UUID NOT NULL UNIQUE,
+        payment_type VARCHAR(20) NOT NULL CHECK (payment_type IN ('Online')),
+        payment_status VARCHAR(20) NOT NULL CHECK (payment_status IN ('Paid', 'Pending', 'Failed')),         
+        payment_intent_id VARCHAR(255) UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE);`;
+    await database.query(query);
+  } catch (error) {
+    console.error("❌ Failed To Create Payments Table.", error);
+    process.exit(1);
+  }
+}
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\models\productReviewsTable.ts
+# ==============================================================
+
+import {database} from "../database/db.js";
+export async function createProductReviewsTable() {
+  try {
+    const query = `CREATE TABLE IF NOT EXISTS reviews (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    product_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    rating DECIMAL(3,2) NOT NULL CHECK (rating BETWEEN 0 AND 5),
+    comment TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE);`;
+    await database.query(query);
+  } catch (error) {
+    console.error("❌ Failed To Create Products Reviews Table.", error);
+    process.exit(1);
+  }
+}
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\models\productTable.ts
+# ==============================================================
+
+import {database} from "../database/db.js";
+
+export async function createProductsTable() {
+  try {
+    const query = `CREATE TABLE IF NOT EXISTS products (
+         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+         name VARCHAR(255) NOT NULL,
+         description TEXT NOT NULL,
+         price DECIMAL(7,2) NOT NULL CHECK (price >= 0),
+         category VARCHAR(100) NOT NULL,
+         ratings DECIMAL(3,2) DEFAULT 0 CHECK (ratings BETWEEN 0 AND 5),
+         images JSONB DEFAULT '[]'::JSONB,
+         stock INT NOT NULL CHECK (stock >= 0),
+         created_by UUID NOT NULL,
+         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE);`;
+    await database.query(query);
+  } catch (error) {
+    console.error("❌ Failed To Create Products Table.", error);
+    process.exit(1);
+  }
+}
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\models\shippinginfoTable.ts
+# ==============================================================
+
+import {database} from "../database/db.js";
+export async function createShippingInfoTable() {
+  try {
+    const query = `CREATE TABLE IF NOT EXISTS shipping_info (
+         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+         order_id UUID NOT NULL UNIQUE,
+         full_name VARCHAR(100) NOT NULL,
+         state VARCHAR(100) NOT NULL,
+         city VARCHAR(100) NOT NULL,
+         country VARCHAR(100) NOT NULL,
+         address TEXT NOT NULL,
+         pincode VARCHAR(10) NOT NULL,
+         phone VARCHAR(20) NOT NULL,
+         FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE);`;
+    await database.query(query);
+  } catch (error) {
+    console.error("❌ Failed To Create Shipping Info Table.", error);
+    process.exit(1);
+  }
+}
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\models\userTable.ts
+# ==============================================================
+
+import { database } from "../database/db.js"; // <- named import
+
+export async function createUserTable() {
+  try {
+    const query = `
+        CREATE TABLE IF NOT EXISTS users (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            name VARCHAR(100) NOT NULL CHECK (char_length(name) >= 3),
+            email VARCHAR(100) UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            role VARCHAR(10) DEFAULT 'User' CHECK (role IN ('User', 'Admin')),
+            avatar JSONB DEFAULT NULL,
+            reset_password_token TEXT DEFAULT NULL,
+            reset_password_expire TIMESTAMP DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `;
+    await database.query(query);
+    console.log("✅ Users table created or already exists");
+  } catch (error) {
+    console.error("❌ Failed To Create Users Table.", error);
+    process.exit(1);
+  }
+}
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\router\adminRoutes.ts
+# ==============================================================
+
+import express from "express";
+import { getAllUsers, deleteUser, dashboardStats } from "../controllers/adminController.js";
+import {
+  authorizedRoles,
+  isAuthenticated,
+} from "../middlewares/authMiddleware.js";
+
+const router = express.Router();
+
+router.get(
+  "/getallusers",
+  isAuthenticated,
+  authorizedRoles("Admin"),
+  getAllUsers
+); // DASHBOARD
+router.delete(
+  "/delete/:id",
+  isAuthenticated,
+  authorizedRoles("Admin"),
+  deleteUser
+);
+router.get(
+  "/fetch/dashboard-stats",
+  isAuthenticated,
+  authorizedRoles("Admin"),
+  dashboardStats
+);
+
+export default router;
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\router\authRoutes.ts
+# ==============================================================
+
+import express from "express";
+import {
+  forgotPassword,
+  getUser,
+  login,
+  logout,
+  register,
+  registerAdmin,
+  resetPassword,
+  updatePassword,
+  updateProfile,
+} from "../controllers/authController.js";
+import { isAuthenticated } from "../middlewares/authMiddleware.js";
+
+const router = express.Router();
+
+router.post("/register", register);
+router.post("/register-admin", registerAdmin);
+router.post("/login", login);
+router.get("/me", isAuthenticated, getUser);
+router.get("/logout", isAuthenticated, logout);
+router.post("/password/forgot", forgotPassword);
+router.put("/password/reset/:token", resetPassword);
+router.put("/password/update", isAuthenticated, updatePassword);
+router.put("/profile/update", isAuthenticated, updateProfile);
+
+export default router;
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\router\orderRoutes.ts
+# ==============================================================
+
+import express from "express";
+import {
+  fetchSingleOrder,
+  placeNewOrder,
+  fetchMyOrders,
+  fetchAllOrders,
+  updateOrderStatus,
+  deleteOrder,
+} from "../controllers/orderController.js";
+import {
+  isAuthenticated,
+  authorizedRoles,
+} from "../middlewares/authMiddleware.js";
+
+const router = express.Router();
+
+router.post("/new", isAuthenticated, placeNewOrder);
+router.get("/orders/me", isAuthenticated, fetchMyOrders);
+router.get("/admin/getall", isAuthenticated, authorizedRoles("Admin"), fetchAllOrders);
+router.put("/admin/update/:orderId", isAuthenticated, authorizedRoles("Admin"), updateOrderStatus);
+router.delete("/admin/delete/:orderId", isAuthenticated, authorizedRoles("Admin"), deleteOrder);
+router.get("/:orderId", isAuthenticated, fetchSingleOrder);
+
+export default router;
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\router\productRoutes.ts
+# ==============================================================
+
+import express from "express";
+import {
+  createProduct,
+  fetchAllProducts,
+  updateProduct,
+  deleteProduct,
+  fetchSingleProduct,
+  postProductReview,
+  deleteReview,
+  fetchAIFilteredProducts,
+} from "../controllers/productController.js";
+import {
+  authorizedRoles,
+  isAuthenticated,
+} from "../middlewares/authMiddleware.js";
+
+const router = express.Router();
+
+router.post("/admin/create", isAuthenticated, authorizedRoles("Admin"), createProduct);
+router.get("/", fetchAllProducts);
+router.get("/singleProduct/:productId", fetchSingleProduct);
+router.put("/post-new/review/:productId", isAuthenticated, postProductReview);
+router.delete("/delete/review/:productId", isAuthenticated, deleteReview);
+router.put("/admin/update/:productId", isAuthenticated, authorizedRoles("Admin"), updateProduct);
+router.delete("/admin/delete/:productId", isAuthenticated, authorizedRoles("Admin"), deleteProduct);
+router.post("/ai-search", isAuthenticated, fetchAIFilteredProducts);
+
+export default router;
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\types\index.ts
+# ==============================================================
+
+import { Request } from "express";
+
+export interface IUser {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  role: "User" | "Admin";
+  avatar: { public_id: string; url: string } | null;
+  reset_password_token: string | null;
+  reset_password_expire: Date | null;
+  created_at: Date;
+}
+
+export interface IOrderItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  quantity: number;
+  price: number;
+  image: string;
+  title: string;
+}
+
+export interface IProductImage {
+  url: string;
+  public_id: string;
+}
+
+export interface IProduct {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  ratings: number;
+  images: IProductImage[];
+  stock: number;
+  created_by: string;
+  created_at: Date;
+}
+
+export interface ICartItem {
+  quantity: number;
+  product: {
+    id: string;
+    name: string;
+    price: number;
+    stock: number;
+    images: IProductImage[];
+  };
+}
+
+export interface IPaymentResult {
+  success: boolean;
+  clientSecret?: string;
+  message?: string;
+}
+
+export interface IAIResult {
+  success: boolean;
+  products?: IProduct[];
+  message?: string;
+}
+
+export interface AuthenticatedRequest extends Request {
+  user: IUser;
+}
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\utils\createTables.ts
+# ==============================================================
+
+import { createUserTable } from "../models/userTable.js";
+import { createOrderItemTable } from "../models/orderItemsTable.js";
+import { createOrdersTable } from "../models/ordersTable.js";
+import { createPaymentsTable } from "../models/paymentsTable.js";
+import { createProductReviewsTable } from "../models/productReviewsTable.js";
+import { createProductsTable } from "../models/productTable.js";
+import { createShippingInfoTable } from "../models/shippinginfoTable.js";
+
+export const createTables = async (): Promise<void> => {
+  try {
+    await createUserTable();
+    await createProductsTable();
+    await createProductReviewsTable();
+    await createOrdersTable();
+    await createOrderItemTable();
+    await createShippingInfoTable();
+    await createPaymentsTable();
+    console.log("All Tables Created Successfully.");
+  } catch (error) {
+    console.error("Error creating tables:", error);
+  }
+};
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\utils\generateForgotPasswordEmailTemplate.ts
+# ==============================================================
+
+export const generateEmailTemplate = (resetPasswordUrl: string): string => {
+  return `
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #000; color: #fff;">
+    <h2 style="color: #fff; text-align: center;">Reset Your Password</h2>
+    <p style="font-size: 16px; color: #ccc;">Dear User,</p>
+    <p style="font-size: 16px; color: #ccc;">You requested to reset your password. Please click the button below to proceed:</p>
+    <div style="text-align: center; margin: 20px 0;">
+      <a href="${resetPasswordUrl}" style="display: inline-block; font-size: 16px; font-weight: bold; color: #000; text-decoration: none; padding: 12px 20px; border: 1px solid #fff; border-radius: 5px; background-color: #fff;">
+        Reset Password
+      </a>
+    </div>
+    <p style="font-size: 16px; color: #ccc;">If you did not request this, please ignore this email. The link will expire in 15 minutes.</p>
+    <p style="font-size: 16px; color: #ccc;">If the button above does not work, copy and paste the following URL into your browser:</p>
+    <p style="font-size: 16px; color: #fff; word-wrap: break-word;">${resetPasswordUrl}</p>
+    <footer style="margin-top: 20px; text-align: center; font-size: 14px; color: #666;">
+      <p>Thank you,<br>Ecommerce Team</p>
+      <p style="font-size: 12px; color: #444;">This is an automated message. Please do not reply to this email.</p>
+    </footer>
+  </div>
+  `;
+};
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\utils\generatePaymentIntent.ts
+# ==============================================================
+
+import { database } from "../database/db.js";
+import Stripe from "stripe";
+import { IPaymentResult } from "../types/index.js";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+
+export async function generatePaymentIntent(
+  orderId: string,
+  totalPrice: number
+): Promise<IPaymentResult> {
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: totalPrice * 100,
+      currency: "usd",
+    });
+
+    await database.query(
+      "INSERT INTO payments (order_id, payment_type, payment_status, payment_intent_id) VALUES ($1, $2, $3, $4) RETURNING *",
+      [orderId, "Online", "Pending", paymentIntent.client_secret]
+    );
+
+    return {
+      success: true,
+      clientSecret: paymentIntent.client_secret ?? undefined,
+    };
+  } catch (error) {
+    console.error("Payment Error:", (error as Error).message ?? error);
+    return { success: false, message: "Payment Failed." };
+  }
+}
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\utils\generateResetPasswordToken.ts
+# ==============================================================
+
+import crypto from "crypto";
+
+interface ResetPasswordToken {
+  resetToken: string;
+  hashedToken: string;
+  resetPasswordExpireTime: number;
+}
+
+export const generateResetPasswordToken = (): ResetPasswordToken => {
+  const resetToken = crypto.randomBytes(20).toString("hex");
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+  const resetPasswordExpireTime = Date.now() + 15 * 60 * 1000;
+  return { resetToken, hashedToken, resetPasswordExpireTime };
+};
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\utils\getAIRecommendation.ts
+# ==============================================================
+
+import { Request } from "express";
+import { IProduct, IAIResult } from "../types/index.js";
+
+export async function getAIRecommendation(
+  _req: Request,
+  userPrompt: string,
+  products: IProduct[]
+): Promise<IAIResult> {
+  const API_KEY = process.env.GEMINI_API_KEY as string;
+  const MODEL = "models/gemini-2.0-flash";
+  const URL = `https://generativelanguage.googleapis.com/v1/${MODEL}:generateContent?key=${API_KEY}`;
+
+  try {
+    const geminiPrompt = `
+      Here is a list of available products:
+      ${JSON.stringify(products, null, 2)}
+
+      Based on the following user request, filter and suggest the best matching products:
+      "${userPrompt}"
+
+      Only return the matching products in JSON format.
+    `;
+
+    const response = await fetch(URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: geminiPrompt }] }],
+      }),
+    });
+
+    const data = (await response.json()) as {
+      error?: { message: string };
+      candidates?: { content: { parts: { text: string }[] } }[];
+    };
+
+    if (data.error) {
+      console.error("Gemini API Error:", data.error);
+      return { success: false, message: `Gemini API Error: ${data.error.message}` };
+    }
+
+    const aiResponseText =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+    const cleanedText = aiResponseText.replace(/```json|```/g, "").trim();
+
+    if (!cleanedText) {
+      return { success: false, message: "AI response is empty or invalid." };
+    }
+
+    let parsedProducts: IProduct[];
+    try {
+      parsedProducts = JSON.parse(cleanedText) as IProduct[];
+    } catch {
+      return { success: false, message: "Failed to parse AI response" };
+    }
+
+    return { success: true, products: parsedProducts };
+  } catch (error) {
+    console.error("Network Error:", error);
+    return { success: false, message: "Internal server error." };
+  }
+}
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\utils\jwtToken.ts
+# ==============================================================
+
+import jwt, { SignOptions } from "jsonwebtoken";
+import { Response } from "express";
+import { IUser } from "../types/index.js";
+
+export const sendToken = (
+  user: IUser,
+  statusCode: number,
+  message: string,
+  res: Response
+): void => {
+  const secret = process.env.JWT_SECRET_KEY as string;
+  const cookieExpireDays = Number(process.env.COOKIE_EXPIRES_IN);
+
+  const options: SignOptions = {
+    expiresIn: (process.env.JWT_EXPIRES_IN as SignOptions["expiresIn"]),
+  };
+
+  const token = jwt.sign({ id: user.id }, secret, options);
+
+  res
+    .status(statusCode)
+    .cookie("token", token, {
+      expires: new Date(Date.now() + cookieExpireDays * 24 * 60 * 60 * 1000),
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+    })
+    .json({ success: true, user, message, token });
+};
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\utils\sendEmail.ts
+# ==============================================================
+
+import nodeMailer, { SentMessageInfo } from "nodemailer";
+
+interface SendEmailOptions {
+  email: string;
+  subject: string;
+  message: string;
+}
+
+export const sendEmail = async ({
+  email,
+  subject,
+  message,
+}: SendEmailOptions): Promise<SentMessageInfo> => {
+  const transporter = nodeMailer.createTransport({
+    host: process.env.SMTP_HOST as string,
+    port: parseInt(process.env.SMTP_PORT as string),
+    secure: true,
+    auth: {
+      user: process.env.SMTP_MAIL as string,
+      pass: process.env.SMTP_PASSWORD as string,
+    },
+    tls: { rejectUnauthorized: false },
+  });
+
+  const mailOptions = {
+    from: process.env.SMTP_MAIL as string,
+    to: email,
+    subject,
+    html: message,
+  };
+
+  try {
+    const info: SentMessageInfo = await transporter.sendMail(mailOptions);
+    console.log("Email sent successfully:", info.messageId);
+    return info;
+  } catch (error) {
+    console.error("Email sending failed:", error);
+    throw error;
+  }
+};
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\package-lock.json
+# ==============================================================
+
+{
+  "name": "server",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "server",
+      "version": "1.0.0",
+      "dependencies": {
+        "bcrypt": "^5.1.1",
+        "cloudinary": "^2.5.1",
+        "cookie-parser": "^1.4.7",
+        "cors": "^2.8.5",
+        "dotenv": "^16.4.7",
+        "express": "^4.21.2",
+        "express-fileupload": "^1.5.1",
+        "jsonwebtoken": "^9.0.2",
+        "nodemailer": "^6.10.0",
+        "pg": "^8.13.3",
+        "stripe": "^17.7.0"
+      },
+      "devDependencies": {
+        "@types/bcryptjs": "^2.4.6",
+        "@types/cookie-parser": "^1.4.8",
+        "@types/cors": "^2.8.17",
+        "@types/express": "^5.0.0",
+        "@types/express-fileupload": "^1.5.1",
+        "@types/jsonwebtoken": "^9.0.9",
+        "@types/multer": "^1.4.12",
+        "@types/node": "^22.13.4",
+        "@types/nodemailer": "^6.4.17",
+        "ts-node": "^10.9.2",
+        "tsx": "^4.21.0",
+        "typescript": "^5.7.3"
+      }
+    },
+    "node_modules/@cspotcode/source-map-support": {
+      "version": "0.8.1",
+      "resolved": "https://registry.npmjs.org/@cspotcode/source-map-support/-/source-map-support-0.8.1.tgz",
+      "integrity": "sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@jridgewell/trace-mapping": "0.3.9"
+      },
+      "engines": {
+        "node": ">=12"
+      }
+    },
+    "node_modules/@esbuild/aix-ppc64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/aix-ppc64/-/aix-ppc64-0.27.4.tgz",
+      "integrity": "sha512-cQPwL2mp2nSmHHJlCyoXgHGhbEPMrEEU5xhkcy3Hs/O7nGZqEpZ2sUtLaL9MORLtDfRvVl2/3PAuEkYZH0Ty8Q==",
+      "cpu": [
+        "ppc64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "aix"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/android-arm": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/android-arm/-/android-arm-0.27.4.tgz",
+      "integrity": "sha512-X9bUgvxiC8CHAGKYufLIHGXPJWnr0OCdR0anD2e21vdvgCI8lIfqFbnoeOz7lBjdrAGUhqLZLcQo6MLhTO2DKQ==",
+      "cpu": [
+        "arm"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "android"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/android-arm64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/android-arm64/-/android-arm64-0.27.4.tgz",
+      "integrity": "sha512-gdLscB7v75wRfu7QSm/zg6Rx29VLdy9eTr2t44sfTW7CxwAtQghZ4ZnqHk3/ogz7xao0QAgrkradbBzcqFPasw==",
+      "cpu": [
+        "arm64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "android"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/android-x64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/android-x64/-/android-x64-0.27.4.tgz",
+      "integrity": "sha512-PzPFnBNVF292sfpfhiyiXCGSn9HZg5BcAz+ivBuSsl6Rk4ga1oEXAamhOXRFyMcjwr2DVtm40G65N3GLeH1Lvw==",
+      "cpu": [
+        "x64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "android"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/darwin-arm64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/darwin-arm64/-/darwin-arm64-0.27.4.tgz",
+      "integrity": "sha512-b7xaGIwdJlht8ZFCvMkpDN6uiSmnxxK56N2GDTMYPr2/gzvfdQN8rTfBsvVKmIVY/X7EM+/hJKEIbbHs9oA4tQ==",
+      "cpu": [
+        "arm64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "darwin"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/darwin-x64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/darwin-x64/-/darwin-x64-0.27.4.tgz",
+      "integrity": "sha512-sR+OiKLwd15nmCdqpXMnuJ9W2kpy0KigzqScqHI3Hqwr7IXxBp3Yva+yJwoqh7rE8V77tdoheRYataNKL4QrPw==",
+      "cpu": [
+        "x64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "darwin"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/freebsd-arm64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/freebsd-arm64/-/freebsd-arm64-0.27.4.tgz",
+      "integrity": "sha512-jnfpKe+p79tCnm4GVav68A7tUFeKQwQyLgESwEAUzyxk/TJr4QdGog9sqWNcUbr/bZt/O/HXouspuQDd9JxFSw==",
+      "cpu": [
+        "arm64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "freebsd"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/freebsd-x64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/freebsd-x64/-/freebsd-x64-0.27.4.tgz",
+      "integrity": "sha512-2kb4ceA/CpfUrIcTUl1wrP/9ad9Atrp5J94Lq69w7UwOMolPIGrfLSvAKJp0RTvkPPyn6CIWrNy13kyLikZRZQ==",
+      "cpu": [
+        "x64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "freebsd"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/linux-arm": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/linux-arm/-/linux-arm-0.27.4.tgz",
+      "integrity": "sha512-aBYgcIxX/wd5n2ys0yESGeYMGF+pv6g0DhZr3G1ZG4jMfruU9Tl1i2Z+Wnj9/KjGz1lTLCcorqE2viePZqj4Eg==",
+      "cpu": [
+        "arm"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "linux"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/linux-arm64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/linux-arm64/-/linux-arm64-0.27.4.tgz",
+      "integrity": "sha512-7nQOttdzVGth1iz57kxg9uCz57dxQLHWxopL6mYuYthohPKEK0vU0C3O21CcBK6KDlkYVcnDXY099HcCDXd9dA==",
+      "cpu": [
+        "arm64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "linux"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/linux-ia32": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/linux-ia32/-/linux-ia32-0.27.4.tgz",
+      "integrity": "sha512-oPtixtAIzgvzYcKBQM/qZ3R+9TEUd1aNJQu0HhGyqtx6oS7qTpvjheIWBbes4+qu1bNlo2V4cbkISr8q6gRBFA==",
+      "cpu": [
+        "ia32"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "linux"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/linux-loong64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/linux-loong64/-/linux-loong64-0.27.4.tgz",
+      "integrity": "sha512-8mL/vh8qeCoRcFH2nM8wm5uJP+ZcVYGGayMavi8GmRJjuI3g1v6Z7Ni0JJKAJW+m0EtUuARb6Lmp4hMjzCBWzA==",
+      "cpu": [
+        "loong64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "linux"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/linux-mips64el": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/linux-mips64el/-/linux-mips64el-0.27.4.tgz",
+      "integrity": "sha512-1RdrWFFiiLIW7LQq9Q2NES+HiD4NyT8Itj9AUeCl0IVCA459WnPhREKgwrpaIfTOe+/2rdntisegiPWn/r/aAw==",
+      "cpu": [
+        "mips64el"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "linux"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/linux-ppc64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/linux-ppc64/-/linux-ppc64-0.27.4.tgz",
+      "integrity": "sha512-tLCwNG47l3sd9lpfyx9LAGEGItCUeRCWeAx6x2Jmbav65nAwoPXfewtAdtbtit/pJFLUWOhpv0FpS6GQAmPrHA==",
+      "cpu": [
+        "ppc64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "linux"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/linux-riscv64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/linux-riscv64/-/linux-riscv64-0.27.4.tgz",
+      "integrity": "sha512-BnASypppbUWyqjd1KIpU4AUBiIhVr6YlHx/cnPgqEkNoVOhHg+YiSVxM1RLfiy4t9cAulbRGTNCKOcqHrEQLIw==",
+      "cpu": [
+        "riscv64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "linux"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/linux-s390x": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/linux-s390x/-/linux-s390x-0.27.4.tgz",
+      "integrity": "sha512-+eUqgb/Z7vxVLezG8bVB9SfBie89gMueS+I0xYh2tJdw3vqA/0ImZJ2ROeWwVJN59ihBeZ7Tu92dF/5dy5FttA==",
+      "cpu": [
+        "s390x"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "linux"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/linux-x64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.27.4.tgz",
+      "integrity": "sha512-S5qOXrKV8BQEzJPVxAwnryi2+Iq5pB40gTEIT69BQONqR7JH1EPIcQ/Uiv9mCnn05jff9umq/5nqzxlqTOg9NA==",
+      "cpu": [
+        "x64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "linux"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/netbsd-arm64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/netbsd-arm64/-/netbsd-arm64-0.27.4.tgz",
+      "integrity": "sha512-xHT8X4sb0GS8qTqiwzHqpY00C95DPAq7nAwX35Ie/s+LO9830hrMd3oX0ZMKLvy7vsonee73x0lmcdOVXFzd6Q==",
+      "cpu": [
+        "arm64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "netbsd"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/netbsd-x64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/netbsd-x64/-/netbsd-x64-0.27.4.tgz",
+      "integrity": "sha512-RugOvOdXfdyi5Tyv40kgQnI0byv66BFgAqjdgtAKqHoZTbTF2QqfQrFwa7cHEORJf6X2ht+l9ABLMP0dnKYsgg==",
+      "cpu": [
+        "x64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "netbsd"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/openbsd-arm64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/openbsd-arm64/-/openbsd-arm64-0.27.4.tgz",
+      "integrity": "sha512-2MyL3IAaTX+1/qP0O1SwskwcwCoOI4kV2IBX1xYnDDqthmq5ArrW94qSIKCAuRraMgPOmG0RDTA74mzYNQA9ow==",
+      "cpu": [
+        "arm64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "openbsd"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/openbsd-x64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/openbsd-x64/-/openbsd-x64-0.27.4.tgz",
+      "integrity": "sha512-u8fg/jQ5aQDfsnIV6+KwLOf1CmJnfu1ShpwqdwC0uA7ZPwFws55Ngc12vBdeUdnuWoQYx/SOQLGDcdlfXhYmXQ==",
+      "cpu": [
+        "x64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "openbsd"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/openharmony-arm64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/openharmony-arm64/-/openharmony-arm64-0.27.4.tgz",
+      "integrity": "sha512-JkTZrl6VbyO8lDQO3yv26nNr2RM2yZzNrNHEsj9bm6dOwwu9OYN28CjzZkH57bh4w0I2F7IodpQvUAEd1mbWXg==",
+      "cpu": [
+        "arm64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "openharmony"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/sunos-x64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/sunos-x64/-/sunos-x64-0.27.4.tgz",
+      "integrity": "sha512-/gOzgaewZJfeJTlsWhvUEmUG4tWEY2Spp5M20INYRg2ZKl9QPO3QEEgPeRtLjEWSW8FilRNacPOg8R1uaYkA6g==",
+      "cpu": [
+        "x64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "sunos"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/win32-arm64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/win32-arm64/-/win32-arm64-0.27.4.tgz",
+      "integrity": "sha512-Z9SExBg2y32smoDQdf1HRwHRt6vAHLXcxD2uGgO/v2jK7Y718Ix4ndsbNMU/+1Qiem9OiOdaqitioZwxivhXYg==",
+      "cpu": [
+        "arm64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "win32"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/win32-ia32": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/win32-ia32/-/win32-ia32-0.27.4.tgz",
+      "integrity": "sha512-DAyGLS0Jz5G5iixEbMHi5KdiApqHBWMGzTtMiJ72ZOLhbu/bzxgAe8Ue8CTS3n3HbIUHQz/L51yMdGMeoxXNJw==",
+      "cpu": [
+        "ia32"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "win32"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@esbuild/win32-x64": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/@esbuild/win32-x64/-/win32-x64-0.27.4.tgz",
+      "integrity": "sha512-+knoa0BDoeXgkNvvV1vvbZX4+hizelrkwmGJBdT17t8FNPwG2lKemmuMZlmaNQ3ws3DKKCxpb4zRZEIp3UxFCg==",
+      "cpu": [
+        "x64"
+      ],
+      "dev": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "win32"
+      ],
+      "engines": {
+        "node": ">=18"
+      }
+    },
+    "node_modules/@jridgewell/resolve-uri": {
+      "version": "3.1.2",
+      "resolved": "https://registry.npmjs.org/@jridgewell/resolve-uri/-/resolve-uri-3.1.2.tgz",
+      "integrity": "sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==",
+      "dev": true,
+      "license": "MIT",
+      "engines": {
+        "node": ">=6.0.0"
+      }
+    },
+    "node_modules/@jridgewell/sourcemap-codec": {
+      "version": "1.5.5",
+      "resolved": "https://registry.npmjs.org/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.5.5.tgz",
+      "integrity": "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/@jridgewell/trace-mapping": {
+      "version": "0.3.9",
+      "resolved": "https://registry.npmjs.org/@jridgewell/trace-mapping/-/trace-mapping-0.3.9.tgz",
+      "integrity": "sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@jridgewell/resolve-uri": "^3.0.3",
+        "@jridgewell/sourcemap-codec": "^1.4.10"
+      }
+    },
+    "node_modules/@mapbox/node-pre-gyp": {
+      "version": "1.0.11",
+      "resolved": "https://registry.npmjs.org/@mapbox/node-pre-gyp/-/node-pre-gyp-1.0.11.tgz",
+      "integrity": "sha512-Yhlar6v9WQgUp/He7BdgzOz8lqMQ8sU+jkCq7Wx8Myc5YFJLbEe7lgui/V7G1qB1DJykHSGwreceSaD60Y0PUQ==",
+      "license": "BSD-3-Clause",
+      "dependencies": {
+        "detect-libc": "^2.0.0",
+        "https-proxy-agent": "^5.0.0",
+        "make-dir": "^3.1.0",
+        "node-fetch": "^2.6.7",
+        "nopt": "^5.0.0",
+        "npmlog": "^5.0.1",
+        "rimraf": "^3.0.2",
+        "semver": "^7.3.5",
+        "tar": "^6.1.11"
+      },
+      "bin": {
+        "node-pre-gyp": "bin/node-pre-gyp"
+      }
+    },
+    "node_modules/@tsconfig/node10": {
+      "version": "1.0.12",
+      "resolved": "https://registry.npmjs.org/@tsconfig/node10/-/node10-1.0.12.tgz",
+      "integrity": "sha512-UCYBaeFvM11aU2y3YPZ//O5Rhj+xKyzy7mvcIoAjASbigy8mHMryP5cK7dgjlz2hWxh1g5pLw084E0a/wlUSFQ==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/@tsconfig/node12": {
+      "version": "1.0.11",
+      "resolved": "https://registry.npmjs.org/@tsconfig/node12/-/node12-1.0.11.tgz",
+      "integrity": "sha512-cqefuRsh12pWyGsIoBKJA9luFu3mRxCA+ORZvA4ktLSzIuCUtWVxGIuXigEwO5/ywWFMZ2QEGKWvkZG1zDMTag==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/@tsconfig/node14": {
+      "version": "1.0.3",
+      "resolved": "https://registry.npmjs.org/@tsconfig/node14/-/node14-1.0.3.tgz",
+      "integrity": "sha512-ysT8mhdixWK6Hw3i1V2AeRqZ5WfXg1G43mqoYlM2nc6388Fq5jcXyr5mRsqViLx/GJYdoL0bfXD8nmF+Zn/Iow==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/@tsconfig/node16": {
+      "version": "1.0.4",
+      "resolved": "https://registry.npmjs.org/@tsconfig/node16/-/node16-1.0.4.tgz",
+      "integrity": "sha512-vxhUy4J8lyeyinH7Azl1pdd43GJhZH/tP2weN8TntQblOY+A0XbT8DJk1/oCPuOOyg/Ja757rG0CgHcWC8OfMA==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/@types/bcryptjs": {
+      "version": "2.4.6",
+      "resolved": "https://registry.npmjs.org/@types/bcryptjs/-/bcryptjs-2.4.6.tgz",
+      "integrity": "sha512-9xlo6R2qDs5uixm0bcIqCeMCE6HiQsIyel9KQySStiyqNl2tnj2mP3DX1Nf56MD6KMenNNlBBsy3LJ7gUEQPXQ==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/@types/body-parser": {
+      "version": "1.19.6",
+      "resolved": "https://registry.npmjs.org/@types/body-parser/-/body-parser-1.19.6.tgz",
+      "integrity": "sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@types/connect": "*",
+        "@types/node": "*"
+      }
+    },
+    "node_modules/@types/busboy": {
+      "version": "1.5.4",
+      "resolved": "https://registry.npmjs.org/@types/busboy/-/busboy-1.5.4.tgz",
+      "integrity": "sha512-kG7WrUuAKK0NoyxfQHsVE6j1m01s6kMma64E+OZenQABMQyTJop1DumUWcLwAQ2JzpefU7PDYoRDKl8uZosFjw==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@types/node": "*"
+      }
+    },
+    "node_modules/@types/connect": {
+      "version": "3.4.38",
+      "resolved": "https://registry.npmjs.org/@types/connect/-/connect-3.4.38.tgz",
+      "integrity": "sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@types/node": "*"
+      }
+    },
+    "node_modules/@types/cookie-parser": {
+      "version": "1.4.10",
+      "resolved": "https://registry.npmjs.org/@types/cookie-parser/-/cookie-parser-1.4.10.tgz",
+      "integrity": "sha512-B4xqkqfZ8Wek+rCOeRxsjMS9OgvzebEzzLYw7NHYuvzb7IdxOkI0ZHGgeEBX4PUM7QGVvNSK60T3OvWj3YfBRg==",
+      "dev": true,
+      "license": "MIT",
+      "peerDependencies": {
+        "@types/express": "*"
+      }
+    },
+    "node_modules/@types/cors": {
+      "version": "2.8.19",
+      "resolved": "https://registry.npmjs.org/@types/cors/-/cors-2.8.19.tgz",
+      "integrity": "sha512-mFNylyeyqN93lfe/9CSxOGREz8cpzAhH+E93xJ4xWQf62V8sQ/24reV2nyzUWM6H6Xji+GGHpkbLe7pVoUEskg==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@types/node": "*"
+      }
+    },
+    "node_modules/@types/express": {
+      "version": "5.0.6",
+      "resolved": "https://registry.npmjs.org/@types/express/-/express-5.0.6.tgz",
+      "integrity": "sha512-sKYVuV7Sv9fbPIt/442koC7+IIwK5olP1KWeD88e/idgoJqDm3JV/YUiPwkoKK92ylff2MGxSz1CSjsXelx0YA==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@types/body-parser": "*",
+        "@types/express-serve-static-core": "^5.0.0",
+        "@types/serve-static": "^2"
+      }
+    },
+    "node_modules/@types/express-fileupload": {
+      "version": "1.5.1",
+      "resolved": "https://registry.npmjs.org/@types/express-fileupload/-/express-fileupload-1.5.1.tgz",
+      "integrity": "sha512-DllImBVI1lCyjl2klky/TEwk60mbNebgXv1669h66g9TfptWSrEFq5a/raHSutaFzjSm1tmn9ypdNfu4jPSixQ==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@types/busboy": "*",
+        "@types/express": "*"
+      }
+    },
+    "node_modules/@types/express-serve-static-core": {
+      "version": "5.1.1",
+      "resolved": "https://registry.npmjs.org/@types/express-serve-static-core/-/express-serve-static-core-5.1.1.tgz",
+      "integrity": "sha512-v4zIMr/cX7/d2BpAEX3KNKL/JrT1s43s96lLvvdTmza1oEvDudCqK9aF/djc/SWgy8Yh0h30TZx5VpzqFCxk5A==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@types/node": "*",
+        "@types/qs": "*",
+        "@types/range-parser": "*",
+        "@types/send": "*"
+      }
+    },
+    "node_modules/@types/http-errors": {
+      "version": "2.0.5",
+      "resolved": "https://registry.npmjs.org/@types/http-errors/-/http-errors-2.0.5.tgz",
+      "integrity": "sha512-r8Tayk8HJnX0FztbZN7oVqGccWgw98T/0neJphO91KkmOzug1KkofZURD4UaD5uH8AqcFLfdPErnBod0u71/qg==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/@types/jsonwebtoken": {
+      "version": "9.0.10",
+      "resolved": "https://registry.npmjs.org/@types/jsonwebtoken/-/jsonwebtoken-9.0.10.tgz",
+      "integrity": "sha512-asx5hIG9Qmf/1oStypjanR7iKTv0gXQ1Ov/jfrX6kS/EO0OFni8orbmGCn0672NHR3kXHwpAwR+B368ZGN/2rA==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@types/ms": "*",
+        "@types/node": "*"
+      }
+    },
+    "node_modules/@types/ms": {
+      "version": "2.1.0",
+      "resolved": "https://registry.npmjs.org/@types/ms/-/ms-2.1.0.tgz",
+      "integrity": "sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/@types/multer": {
+      "version": "1.4.13",
+      "resolved": "https://registry.npmjs.org/@types/multer/-/multer-1.4.13.tgz",
+      "integrity": "sha512-bhhdtPw7JqCiEfC9Jimx5LqX9BDIPJEh2q/fQ4bqbBPtyEZYr3cvF22NwG0DmPZNYA0CAf2CnqDB4KIGGpJcaw==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@types/express": "*"
+      }
+    },
+    "node_modules/@types/node": {
+      "version": "22.19.15",
+      "resolved": "https://registry.npmjs.org/@types/node/-/node-22.19.15.tgz",
+      "integrity": "sha512-F0R/h2+dsy5wJAUe3tAU6oqa2qbWY5TpNfL/RGmo1y38hiyO1w3x2jPtt76wmuaJI4DQnOBu21cNXQ2STIUUWg==",
+      "license": "MIT",
+      "dependencies": {
+        "undici-types": "~6.21.0"
+      }
+    },
+    "node_modules/@types/nodemailer": {
+      "version": "6.4.23",
+      "resolved": "https://registry.npmjs.org/@types/nodemailer/-/nodemailer-6.4.23.tgz",
+      "integrity": "sha512-aFV3/NsYFLSx9mbb5gtirBSXJnAlrusoKNuPbxsASWc7vrKLmIrTQRpdcxNcSFL3VW2A2XpeLEavwb2qMi6nlQ==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@types/node": "*"
+      }
+    },
+    "node_modules/@types/qs": {
+      "version": "6.15.0",
+      "resolved": "https://registry.npmjs.org/@types/qs/-/qs-6.15.0.tgz",
+      "integrity": "sha512-JawvT8iBVWpzTrz3EGw9BTQFg3BQNmwERdKE22vlTxawwtbyUSlMppvZYKLZzB5zgACXdXxbD3m1bXaMqP/9ow==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/@types/range-parser": {
+      "version": "1.2.7",
+      "resolved": "https://registry.npmjs.org/@types/range-parser/-/range-parser-1.2.7.tgz",
+      "integrity": "sha512-hKormJbkJqzQGhziax5PItDUTMAM9uE2XXQmM37dyd4hVM+5aVl7oVxMVUiVQn2oCQFN/LKCZdvSM0pFRqbSmQ==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/@types/send": {
+      "version": "1.2.1",
+      "resolved": "https://registry.npmjs.org/@types/send/-/send-1.2.1.tgz",
+      "integrity": "sha512-arsCikDvlU99zl1g69TcAB3mzZPpxgw0UQnaHeC1Nwb015xp8bknZv5rIfri9xTOcMuaVgvabfIRA7PSZVuZIQ==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@types/node": "*"
+      }
+    },
+    "node_modules/@types/serve-static": {
+      "version": "2.2.0",
+      "resolved": "https://registry.npmjs.org/@types/serve-static/-/serve-static-2.2.0.tgz",
+      "integrity": "sha512-8mam4H1NHLtu7nmtalF7eyBH14QyOASmcxHhSfEoRyr0nP/YdoesEtU+uSRvMe96TW/HPTtkoKqQLl53N7UXMQ==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@types/http-errors": "*",
+        "@types/node": "*"
+      }
+    },
+    "node_modules/abbrev": {
+      "version": "1.1.1",
+      "resolved": "https://registry.npmjs.org/abbrev/-/abbrev-1.1.1.tgz",
+      "integrity": "sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==",
+      "license": "ISC"
+    },
+    "node_modules/accepts": {
+      "version": "1.3.8",
+      "resolved": "https://registry.npmjs.org/accepts/-/accepts-1.3.8.tgz",
+      "integrity": "sha512-PYAthTa2m2VKxuvSD3DPC/Gy+U+sOA1LAuT8mkmRuvw+NACSaeXEQ+NHcVF7rONl6qcaxV3Uuemwawk+7+SJLw==",
+      "license": "MIT",
+      "dependencies": {
+        "mime-types": "~2.1.34",
+        "negotiator": "0.6.3"
+      },
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/acorn": {
+      "version": "8.16.0",
+      "resolved": "https://registry.npmjs.org/acorn/-/acorn-8.16.0.tgz",
+      "integrity": "sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw==",
+      "dev": true,
+      "license": "MIT",
+      "bin": {
+        "acorn": "bin/acorn"
+      },
+      "engines": {
+        "node": ">=0.4.0"
+      }
+    },
+    "node_modules/acorn-walk": {
+      "version": "8.3.5",
+      "resolved": "https://registry.npmjs.org/acorn-walk/-/acorn-walk-8.3.5.tgz",
+      "integrity": "sha512-HEHNfbars9v4pgpW6SO1KSPkfoS0xVOM/9UzkJltjlsHZmJasxg8aXkuZa7SMf8vKGIBhpUsPluQSqhJFCqebw==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "acorn": "^8.11.0"
+      },
+      "engines": {
+        "node": ">=0.4.0"
+      }
+    },
+    "node_modules/agent-base": {
+      "version": "6.0.2",
+      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-6.0.2.tgz",
+      "integrity": "sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==",
+      "license": "MIT",
+      "dependencies": {
+        "debug": "4"
+      },
+      "engines": {
+        "node": ">= 6.0.0"
+      }
+    },
+    "node_modules/ansi-regex": {
+      "version": "5.0.1",
+      "resolved": "https://registry.npmjs.org/ansi-regex/-/ansi-regex-5.0.1.tgz",
+      "integrity": "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=8"
+      }
+    },
+    "node_modules/aproba": {
+      "version": "2.1.0",
+      "resolved": "https://registry.npmjs.org/aproba/-/aproba-2.1.0.tgz",
+      "integrity": "sha512-tLIEcj5GuR2RSTnxNKdkK0dJ/GrC7P38sUkiDmDuHfsHmbagTFAxDVIBltoklXEVIQ/f14IL8IMJ5pn9Hez1Ew==",
+      "license": "ISC"
+    },
+    "node_modules/are-we-there-yet": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/are-we-there-yet/-/are-we-there-yet-2.0.0.tgz",
+      "integrity": "sha512-Ci/qENmwHnsYo9xKIcUJN5LeDKdJ6R1Z1j9V/J5wyq8nh/mYPEpIKJbBZXtZjG04HiK7zV/p6Vs9952MrMeUIw==",
+      "deprecated": "This package is no longer supported.",
+      "license": "ISC",
+      "dependencies": {
+        "delegates": "^1.0.0",
+        "readable-stream": "^3.6.0"
+      },
+      "engines": {
+        "node": ">=10"
+      }
+    },
+    "node_modules/arg": {
+      "version": "4.1.3",
+      "resolved": "https://registry.npmjs.org/arg/-/arg-4.1.3.tgz",
+      "integrity": "sha512-58S9QDqG0Xx27YwPSt9fJxivjYl432YCwfDMfZ+71RAqUrZef7LrKQZ3LHLOwCS4FLNBplP533Zx895SeOCHvA==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/array-flatten": {
+      "version": "1.1.1",
+      "resolved": "https://registry.npmjs.org/array-flatten/-/array-flatten-1.1.1.tgz",
+      "integrity": "sha512-PCVAQswWemu6UdxsDFFX/+gVeYqKAod3D3UVm91jHwynguOwAvYPhx8nNlM++NqRcK6CxxpUafjmhIdKiHibqg==",
+      "license": "MIT"
+    },
+    "node_modules/balanced-match": {
+      "version": "1.0.2",
+      "resolved": "https://registry.npmjs.org/balanced-match/-/balanced-match-1.0.2.tgz",
+      "integrity": "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==",
+      "license": "MIT"
+    },
+    "node_modules/bcrypt": {
+      "version": "5.1.1",
+      "resolved": "https://registry.npmjs.org/bcrypt/-/bcrypt-5.1.1.tgz",
+      "integrity": "sha512-AGBHOG5hPYZ5Xl9KXzU5iKq9516yEmvCKDg3ecP5kX2aB6UqTeXZxk2ELnDgDm6BQSMlLt9rDB4LoSMx0rYwww==",
+      "hasInstallScript": true,
+      "license": "MIT",
+      "dependencies": {
+        "@mapbox/node-pre-gyp": "^1.0.11",
+        "node-addon-api": "^5.0.0"
+      },
+      "engines": {
+        "node": ">= 10.0.0"
+      }
+    },
+    "node_modules/body-parser": {
+      "version": "1.20.4",
+      "resolved": "https://registry.npmjs.org/body-parser/-/body-parser-1.20.4.tgz",
+      "integrity": "sha512-ZTgYYLMOXY9qKU/57FAo8F+HA2dGX7bqGc71txDRC1rS4frdFI5R7NhluHxH6M0YItAP0sHB4uqAOcYKxO6uGA==",
+      "license": "MIT",
+      "dependencies": {
+        "bytes": "~3.1.2",
+        "content-type": "~1.0.5",
+        "debug": "2.6.9",
+        "depd": "2.0.0",
+        "destroy": "~1.2.0",
+        "http-errors": "~2.0.1",
+        "iconv-lite": "~0.4.24",
+        "on-finished": "~2.4.1",
+        "qs": "~6.14.0",
+        "raw-body": "~2.5.3",
+        "type-is": "~1.6.18",
+        "unpipe": "~1.0.0"
+      },
+      "engines": {
+        "node": ">= 0.8",
+        "npm": "1.2.8000 || >= 1.4.16"
+      }
+    },
+    "node_modules/body-parser/node_modules/debug": {
+      "version": "2.6.9",
+      "resolved": "https://registry.npmjs.org/debug/-/debug-2.6.9.tgz",
+      "integrity": "sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==",
+      "license": "MIT",
+      "dependencies": {
+        "ms": "2.0.0"
+      }
+    },
+    "node_modules/body-parser/node_modules/ms": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz",
+      "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==",
+      "license": "MIT"
+    },
+    "node_modules/brace-expansion": {
+      "version": "1.1.12",
+      "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.12.tgz",
+      "integrity": "sha512-9T9UjW3r0UW5c1Q7GTwllptXwhvYmEzFhzMfZ9H7FQWt+uZePjZPjBP/W1ZEyZ1twGWom5/56TF4lPcqjnDHcg==",
+      "license": "MIT",
+      "dependencies": {
+        "balanced-match": "^1.0.0",
+        "concat-map": "0.0.1"
+      }
+    },
+    "node_modules/buffer-equal-constant-time": {
+      "version": "1.0.1",
+      "resolved": "https://registry.npmjs.org/buffer-equal-constant-time/-/buffer-equal-constant-time-1.0.1.tgz",
+      "integrity": "sha512-zRpUiDwd/xk6ADqPMATG8vc9VPrkck7T07OIx0gnjmJAnHnTVXNQG3vfvWNuiZIkwu9KrKdA1iJKfsfTVxE6NA==",
+      "license": "BSD-3-Clause"
+    },
+    "node_modules/busboy": {
+      "version": "1.6.0",
+      "resolved": "https://registry.npmjs.org/busboy/-/busboy-1.6.0.tgz",
+      "integrity": "sha512-8SFQbg/0hQ9xy3UNTB0YEnsNBbWfhf7RtnzpL7TkBiTBRfrQ9Fxcnz7VJsleJpyp6rVLvXiuORqjlHi5q+PYuA==",
+      "dependencies": {
+        "streamsearch": "^1.1.0"
+      },
+      "engines": {
+        "node": ">=10.16.0"
+      }
+    },
+    "node_modules/bytes": {
+      "version": "3.1.2",
+      "resolved": "https://registry.npmjs.org/bytes/-/bytes-3.1.2.tgz",
+      "integrity": "sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.8"
+      }
+    },
+    "node_modules/call-bind-apply-helpers": {
+      "version": "1.0.2",
+      "resolved": "https://registry.npmjs.org/call-bind-apply-helpers/-/call-bind-apply-helpers-1.0.2.tgz",
+      "integrity": "sha512-Sp1ablJ0ivDkSzjcaJdxEunN5/XvksFJ2sMBFfq6x0ryhQV/2b/KwFe21cMpmHtPOSij8K99/wSfoEuTObmuMQ==",
+      "license": "MIT",
+      "dependencies": {
+        "es-errors": "^1.3.0",
+        "function-bind": "^1.1.2"
+      },
+      "engines": {
+        "node": ">= 0.4"
+      }
+    },
+    "node_modules/call-bound": {
+      "version": "1.0.4",
+      "resolved": "https://registry.npmjs.org/call-bound/-/call-bound-1.0.4.tgz",
+      "integrity": "sha512-+ys997U96po4Kx/ABpBCqhA9EuxJaQWDQg7295H4hBphv3IZg0boBKuwYpt4YXp6MZ5AmZQnU/tyMTlRpaSejg==",
+      "license": "MIT",
+      "dependencies": {
+        "call-bind-apply-helpers": "^1.0.2",
+        "get-intrinsic": "^1.3.0"
+      },
+      "engines": {
+        "node": ">= 0.4"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/ljharb"
+      }
+    },
+    "node_modules/chownr": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/chownr/-/chownr-2.0.0.tgz",
+      "integrity": "sha512-bIomtDF5KGpdogkLd9VspvFzk9KfpyyGlS8YFVZl7TGPBHL5snIOnxeshwVgPteQ9b4Eydl+pVbIyE1DcvCWgQ==",
+      "license": "ISC",
+      "engines": {
+        "node": ">=10"
+      }
+    },
+    "node_modules/cloudinary": {
+      "version": "2.9.0",
+      "resolved": "https://registry.npmjs.org/cloudinary/-/cloudinary-2.9.0.tgz",
+      "integrity": "sha512-F3iKMOy4y0zy0bi5JBp94SC7HY7i/ImfTPSUV07iJmRzH1Iz8WavFfOlJTR1zvYM/xKGoiGZ3my/zy64In0IQQ==",
+      "license": "MIT",
+      "dependencies": {
+        "lodash": "^4.17.21"
+      },
+      "engines": {
+        "node": ">=9"
+      }
+    },
+    "node_modules/color-support": {
+      "version": "1.1.3",
+      "resolved": "https://registry.npmjs.org/color-support/-/color-support-1.1.3.tgz",
+      "integrity": "sha512-qiBjkpbMLO/HL68y+lh4q0/O1MZFj2RX6X/KmMa3+gJD3z+WwI1ZzDHysvqHGS3mP6mznPckpXmw1nI9cJjyRg==",
+      "license": "ISC",
+      "bin": {
+        "color-support": "bin.js"
+      }
+    },
+    "node_modules/concat-map": {
+      "version": "0.0.1",
+      "resolved": "https://registry.npmjs.org/concat-map/-/concat-map-0.0.1.tgz",
+      "integrity": "sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==",
+      "license": "MIT"
+    },
+    "node_modules/console-control-strings": {
+      "version": "1.1.0",
+      "resolved": "https://registry.npmjs.org/console-control-strings/-/console-control-strings-1.1.0.tgz",
+      "integrity": "sha512-ty/fTekppD2fIwRvnZAVdeOiGd1c7YXEixbgJTNzqcxJWKQnjJ/V1bNEEE6hygpM3WjwHFUVK6HTjWSzV4a8sQ==",
+      "license": "ISC"
+    },
+    "node_modules/content-disposition": {
+      "version": "0.5.4",
+      "resolved": "https://registry.npmjs.org/content-disposition/-/content-disposition-0.5.4.tgz",
+      "integrity": "sha512-FveZTNuGw04cxlAiWbzi6zTAL/lhehaWbTtgluJh4/E95DqMwTmha3KZN1aAWA8cFIhHzMZUvLevkw5Rqk+tSQ==",
+      "license": "MIT",
+      "dependencies": {
+        "safe-buffer": "5.2.1"
+      },
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/content-type": {
+      "version": "1.0.5",
+      "resolved": "https://registry.npmjs.org/content-type/-/content-type-1.0.5.tgz",
+      "integrity": "sha512-nTjqfcBFEipKdXCv4YDQWCfmcLZKm81ldF0pAopTvyrFGVbcR6P/VAAd5G7N+0tTr8QqiU0tFadD6FK4NtJwOA==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/cookie": {
+      "version": "0.7.2",
+      "resolved": "https://registry.npmjs.org/cookie/-/cookie-0.7.2.tgz",
+      "integrity": "sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/cookie-parser": {
+      "version": "1.4.7",
+      "resolved": "https://registry.npmjs.org/cookie-parser/-/cookie-parser-1.4.7.tgz",
+      "integrity": "sha512-nGUvgXnotP3BsjiLX2ypbQnWoGUPIIfHQNZkkC668ntrzGWEZVW70HDEB1qnNGMicPje6EttlIgzo51YSwNQGw==",
+      "license": "MIT",
+      "dependencies": {
+        "cookie": "0.7.2",
+        "cookie-signature": "1.0.6"
+      },
+      "engines": {
+        "node": ">= 0.8.0"
+      }
+    },
+    "node_modules/cookie-signature": {
+      "version": "1.0.6",
+      "resolved": "https://registry.npmjs.org/cookie-signature/-/cookie-signature-1.0.6.tgz",
+      "integrity": "sha512-QADzlaHc8icV8I7vbaJXJwod9HWYp8uCqf1xa4OfNu1T7JVxQIrUgOWtHdNDtPiywmFbiS12VjotIXLrKM3orQ==",
+      "license": "MIT"
+    },
+    "node_modules/cors": {
+      "version": "2.8.6",
+      "resolved": "https://registry.npmjs.org/cors/-/cors-2.8.6.tgz",
+      "integrity": "sha512-tJtZBBHA6vjIAaF6EnIaq6laBBP9aq/Y3ouVJjEfoHbRBcHBAHYcMh/w8LDrk2PvIMMq8gmopa5D4V8RmbrxGw==",
+      "license": "MIT",
+      "dependencies": {
+        "object-assign": "^4",
+        "vary": "^1"
+      },
+      "engines": {
+        "node": ">= 0.10"
+      },
+      "funding": {
+        "type": "opencollective",
+        "url": "https://opencollective.com/express"
+      }
+    },
+    "node_modules/create-require": {
+      "version": "1.1.1",
+      "resolved": "https://registry.npmjs.org/create-require/-/create-require-1.1.1.tgz",
+      "integrity": "sha512-dcKFX3jn0MpIaXjisoRvexIJVEKzaq7z2rZKxf+MSr9TkdmHmsU4m2lcLojrj/FHl8mk5VxMmYA+ftRkP/3oKQ==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/debug": {
+      "version": "4.4.3",
+      "resolved": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz",
+      "integrity": "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==",
+      "license": "MIT",
+      "dependencies": {
+        "ms": "^2.1.3"
+      },
+      "engines": {
+        "node": ">=6.0"
+      },
+      "peerDependenciesMeta": {
+        "supports-color": {
+          "optional": true
+        }
+      }
+    },
+    "node_modules/delegates": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/delegates/-/delegates-1.0.0.tgz",
+      "integrity": "sha512-bd2L678uiWATM6m5Z1VzNCErI3jiGzt6HGY8OVICs40JQq/HALfbyNJmp0UDakEY4pMMaN0Ly5om/B1VI/+xfQ==",
+      "license": "MIT"
+    },
+    "node_modules/depd": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/depd/-/depd-2.0.0.tgz",
+      "integrity": "sha512-g7nH6P6dyDioJogAAGprGpCtVImJhpPk/roCzdb3fIh61/s/nPsfR6onyMwkCAR/OlC3yBC0lESvUoQEAssIrw==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.8"
+      }
+    },
+    "node_modules/destroy": {
+      "version": "1.2.0",
+      "resolved": "https://registry.npmjs.org/destroy/-/destroy-1.2.0.tgz",
+      "integrity": "sha512-2sJGJTaXIIaR1w4iJSNoN0hnMY7Gpc/n8D4qSCJw8QqFWXf7cuAgnEHxBpweaVcPevC2l3KpjYCx3NypQQgaJg==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.8",
+        "npm": "1.2.8000 || >= 1.4.16"
+      }
+    },
+    "node_modules/detect-libc": {
+      "version": "2.1.2",
+      "resolved": "https://registry.npmjs.org/detect-libc/-/detect-libc-2.1.2.tgz",
+      "integrity": "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==",
+      "license": "Apache-2.0",
+      "engines": {
+        "node": ">=8"
+      }
+    },
+    "node_modules/diff": {
+      "version": "4.0.4",
+      "resolved": "https://registry.npmjs.org/diff/-/diff-4.0.4.tgz",
+      "integrity": "sha512-X07nttJQkwkfKfvTPG/KSnE2OMdcUCao6+eXF3wmnIQRn2aPAHH3VxDbDOdegkd6JbPsXqShpvEOHfAT+nCNwQ==",
+      "dev": true,
+      "license": "BSD-3-Clause",
+      "engines": {
+        "node": ">=0.3.1"
+      }
+    },
+    "node_modules/dotenv": {
+      "version": "16.6.1",
+      "resolved": "https://registry.npmjs.org/dotenv/-/dotenv-16.6.1.tgz",
+      "integrity": "sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==",
+      "license": "BSD-2-Clause",
+      "engines": {
+        "node": ">=12"
+      },
+      "funding": {
+        "url": "https://dotenvx.com"
+      }
+    },
+    "node_modules/dunder-proto": {
+      "version": "1.0.1",
+      "resolved": "https://registry.npmjs.org/dunder-proto/-/dunder-proto-1.0.1.tgz",
+      "integrity": "sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==",
+      "license": "MIT",
+      "dependencies": {
+        "call-bind-apply-helpers": "^1.0.1",
+        "es-errors": "^1.3.0",
+        "gopd": "^1.2.0"
+      },
+      "engines": {
+        "node": ">= 0.4"
+      }
+    },
+    "node_modules/ecdsa-sig-formatter": {
+      "version": "1.0.11",
+      "resolved": "https://registry.npmjs.org/ecdsa-sig-formatter/-/ecdsa-sig-formatter-1.0.11.tgz",
+      "integrity": "sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ==",
+      "license": "Apache-2.0",
+      "dependencies": {
+        "safe-buffer": "^5.0.1"
+      }
+    },
+    "node_modules/ee-first": {
+      "version": "1.1.1",
+      "resolved": "https://registry.npmjs.org/ee-first/-/ee-first-1.1.1.tgz",
+      "integrity": "sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==",
+      "license": "MIT"
+    },
+    "node_modules/emoji-regex": {
+      "version": "8.0.0",
+      "resolved": "https://registry.npmjs.org/emoji-regex/-/emoji-regex-8.0.0.tgz",
+      "integrity": "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==",
+      "license": "MIT"
+    },
+    "node_modules/encodeurl": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/encodeurl/-/encodeurl-2.0.0.tgz",
+      "integrity": "sha512-Q0n9HRi4m6JuGIV1eFlmvJB7ZEVxu93IrMyiMsGC0lrMJMWzRgx6WGquyfQgZVb31vhGgXnfmPNNXmxnOkRBrg==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.8"
+      }
+    },
+    "node_modules/es-define-property": {
+      "version": "1.0.1",
+      "resolved": "https://registry.npmjs.org/es-define-property/-/es-define-property-1.0.1.tgz",
+      "integrity": "sha512-e3nRfgfUZ4rNGL232gUgX06QNyyez04KdjFrF+LTRoOXmrOgFKDg4BCdsjW8EnT69eqdYGmRpJwiPVYNrCaW3g==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.4"
+      }
+    },
+    "node_modules/es-errors": {
+      "version": "1.3.0",
+      "resolved": "https://registry.npmjs.org/es-errors/-/es-errors-1.3.0.tgz",
+      "integrity": "sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.4"
+      }
+    },
+    "node_modules/es-object-atoms": {
+      "version": "1.1.1",
+      "resolved": "https://registry.npmjs.org/es-object-atoms/-/es-object-atoms-1.1.1.tgz",
+      "integrity": "sha512-FGgH2h8zKNim9ljj7dankFPcICIK9Cp5bm+c2gQSYePhpaG5+esrLODihIorn+Pe6FGJzWhXQotPv73jTaldXA==",
+      "license": "MIT",
+      "dependencies": {
+        "es-errors": "^1.3.0"
+      },
+      "engines": {
+        "node": ">= 0.4"
+      }
+    },
+    "node_modules/esbuild": {
+      "version": "0.27.4",
+      "resolved": "https://registry.npmjs.org/esbuild/-/esbuild-0.27.4.tgz",
+      "integrity": "sha512-Rq4vbHnYkK5fws5NF7MYTU68FPRE1ajX7heQ/8QXXWqNgqqJ/GkmmyxIzUnf2Sr/bakf8l54716CcMGHYhMrrQ==",
+      "dev": true,
+      "hasInstallScript": true,
+      "license": "MIT",
+      "bin": {
+        "esbuild": "bin/esbuild"
+      },
+      "engines": {
+        "node": ">=18"
+      },
+      "optionalDependencies": {
+        "@esbuild/aix-ppc64": "0.27.4",
+        "@esbuild/android-arm": "0.27.4",
+        "@esbuild/android-arm64": "0.27.4",
+        "@esbuild/android-x64": "0.27.4",
+        "@esbuild/darwin-arm64": "0.27.4",
+        "@esbuild/darwin-x64": "0.27.4",
+        "@esbuild/freebsd-arm64": "0.27.4",
+        "@esbuild/freebsd-x64": "0.27.4",
+        "@esbuild/linux-arm": "0.27.4",
+        "@esbuild/linux-arm64": "0.27.4",
+        "@esbuild/linux-ia32": "0.27.4",
+        "@esbuild/linux-loong64": "0.27.4",
+        "@esbuild/linux-mips64el": "0.27.4",
+        "@esbuild/linux-ppc64": "0.27.4",
+        "@esbuild/linux-riscv64": "0.27.4",
+        "@esbuild/linux-s390x": "0.27.4",
+        "@esbuild/linux-x64": "0.27.4",
+        "@esbuild/netbsd-arm64": "0.27.4",
+        "@esbuild/netbsd-x64": "0.27.4",
+        "@esbuild/openbsd-arm64": "0.27.4",
+        "@esbuild/openbsd-x64": "0.27.4",
+        "@esbuild/openharmony-arm64": "0.27.4",
+        "@esbuild/sunos-x64": "0.27.4",
+        "@esbuild/win32-arm64": "0.27.4",
+        "@esbuild/win32-ia32": "0.27.4",
+        "@esbuild/win32-x64": "0.27.4"
+      }
+    },
+    "node_modules/escape-html": {
+      "version": "1.0.3",
+      "resolved": "https://registry.npmjs.org/escape-html/-/escape-html-1.0.3.tgz",
+      "integrity": "sha512-NiSupZ4OeuGwr68lGIeym/ksIZMJodUGOSCZ/FSnTxcrekbvqrgdUxlJOMpijaKZVjAJrWrGs/6Jy8OMuyj9ow==",
+      "license": "MIT"
+    },
+    "node_modules/etag": {
+      "version": "1.8.1",
+      "resolved": "https://registry.npmjs.org/etag/-/etag-1.8.1.tgz",
+      "integrity": "sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/express": {
+      "version": "4.22.1",
+      "resolved": "https://registry.npmjs.org/express/-/express-4.22.1.tgz",
+      "integrity": "sha512-F2X8g9P1X7uCPZMA3MVf9wcTqlyNp7IhH5qPCI0izhaOIYXaW9L535tGA3qmjRzpH+bZczqq7hVKxTR4NWnu+g==",
+      "license": "MIT",
+      "dependencies": {
+        "accepts": "~1.3.8",
+        "array-flatten": "1.1.1",
+        "body-parser": "~1.20.3",
+        "content-disposition": "~0.5.4",
+        "content-type": "~1.0.4",
+        "cookie": "~0.7.1",
+        "cookie-signature": "~1.0.6",
+        "debug": "2.6.9",
+        "depd": "2.0.0",
+        "encodeurl": "~2.0.0",
+        "escape-html": "~1.0.3",
+        "etag": "~1.8.1",
+        "finalhandler": "~1.3.1",
+        "fresh": "~0.5.2",
+        "http-errors": "~2.0.0",
+        "merge-descriptors": "1.0.3",
+        "methods": "~1.1.2",
+        "on-finished": "~2.4.1",
+        "parseurl": "~1.3.3",
+        "path-to-regexp": "~0.1.12",
+        "proxy-addr": "~2.0.7",
+        "qs": "~6.14.0",
+        "range-parser": "~1.2.1",
+        "safe-buffer": "5.2.1",
+        "send": "~0.19.0",
+        "serve-static": "~1.16.2",
+        "setprototypeof": "1.2.0",
+        "statuses": "~2.0.1",
+        "type-is": "~1.6.18",
+        "utils-merge": "1.0.1",
+        "vary": "~1.1.2"
+      },
+      "engines": {
+        "node": ">= 0.10.0"
+      },
+      "funding": {
+        "type": "opencollective",
+        "url": "https://opencollective.com/express"
+      }
+    },
+    "node_modules/express-fileupload": {
+      "version": "1.5.2",
+      "resolved": "https://registry.npmjs.org/express-fileupload/-/express-fileupload-1.5.2.tgz",
+      "integrity": "sha512-wxUJn2vTHvj/kZCVmc5/bJO15C7aSMyHeuXYY3geKpeKibaAoQGcEv5+sM6nHS2T7VF+QHS4hTWPiY2mKofEdg==",
+      "license": "MIT",
+      "dependencies": {
+        "busboy": "^1.6.0"
+      },
+      "engines": {
+        "node": ">=12.0.0"
+      }
+    },
+    "node_modules/express/node_modules/debug": {
+      "version": "2.6.9",
+      "resolved": "https://registry.npmjs.org/debug/-/debug-2.6.9.tgz",
+      "integrity": "sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==",
+      "license": "MIT",
+      "dependencies": {
+        "ms": "2.0.0"
+      }
+    },
+    "node_modules/express/node_modules/ms": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz",
+      "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==",
+      "license": "MIT"
+    },
+    "node_modules/finalhandler": {
+      "version": "1.3.2",
+      "resolved": "https://registry.npmjs.org/finalhandler/-/finalhandler-1.3.2.tgz",
+      "integrity": "sha512-aA4RyPcd3badbdABGDuTXCMTtOneUCAYH/gxoYRTZlIJdF0YPWuGqiAsIrhNnnqdXGswYk6dGujem4w80UJFhg==",
+      "license": "MIT",
+      "dependencies": {
+        "debug": "2.6.9",
+        "encodeurl": "~2.0.0",
+        "escape-html": "~1.0.3",
+        "on-finished": "~2.4.1",
+        "parseurl": "~1.3.3",
+        "statuses": "~2.0.2",
+        "unpipe": "~1.0.0"
+      },
+      "engines": {
+        "node": ">= 0.8"
+      }
+    },
+    "node_modules/finalhandler/node_modules/debug": {
+      "version": "2.6.9",
+      "resolved": "https://registry.npmjs.org/debug/-/debug-2.6.9.tgz",
+      "integrity": "sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==",
+      "license": "MIT",
+      "dependencies": {
+        "ms": "2.0.0"
+      }
+    },
+    "node_modules/finalhandler/node_modules/ms": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz",
+      "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==",
+      "license": "MIT"
+    },
+    "node_modules/forwarded": {
+      "version": "0.2.0",
+      "resolved": "https://registry.npmjs.org/forwarded/-/forwarded-0.2.0.tgz",
+      "integrity": "sha512-buRG0fpBtRHSTCOASe6hD258tEubFoRLb4ZNA6NxMVHNw2gOcwHo9wyablzMzOA5z9xA9L1KNjk/Nt6MT9aYow==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/fresh": {
+      "version": "0.5.2",
+      "resolved": "https://registry.npmjs.org/fresh/-/fresh-0.5.2.tgz",
+      "integrity": "sha512-zJ2mQYM18rEFOudeV4GShTGIQ7RbzA7ozbU9I/XBpm7kqgMywgmylMwXHxZJmkVoYkna9d2pVXVXPdYTP9ej8Q==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/fs-minipass": {
+      "version": "2.1.0",
+      "resolved": "https://registry.npmjs.org/fs-minipass/-/fs-minipass-2.1.0.tgz",
+      "integrity": "sha512-V/JgOLFCS+R6Vcq0slCuaeWEdNC3ouDlJMNIsacH2VtALiu9mV4LPrHc5cDl8k5aw6J8jwgWWpiTo5RYhmIzvg==",
+      "license": "ISC",
+      "dependencies": {
+        "minipass": "^3.0.0"
+      },
+      "engines": {
+        "node": ">= 8"
+      }
+    },
+    "node_modules/fs-minipass/node_modules/minipass": {
+      "version": "3.3.6",
+      "resolved": "https://registry.npmjs.org/minipass/-/minipass-3.3.6.tgz",
+      "integrity": "sha512-DxiNidxSEK+tHG6zOIklvNOwm3hvCrbUrdtzY74U6HKTJxvIDfOUL5W5P2Ghd3DTkhhKPYGqeNUIh5qcM4YBfw==",
+      "license": "ISC",
+      "dependencies": {
+        "yallist": "^4.0.0"
+      },
+      "engines": {
+        "node": ">=8"
+      }
+    },
+    "node_modules/fs.realpath": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/fs.realpath/-/fs.realpath-1.0.0.tgz",
+      "integrity": "sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==",
+      "license": "ISC"
+    },
+    "node_modules/fsevents": {
+      "version": "2.3.3",
+      "resolved": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz",
+      "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==",
+      "dev": true,
+      "hasInstallScript": true,
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "darwin"
+      ],
+      "engines": {
+        "node": "^8.16.0 || ^10.6.0 || >=11.0.0"
+      }
+    },
+    "node_modules/function-bind": {
+      "version": "1.1.2",
+      "resolved": "https://registry.npmjs.org/function-bind/-/function-bind-1.1.2.tgz",
+      "integrity": "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==",
+      "license": "MIT",
+      "funding": {
+        "url": "https://github.com/sponsors/ljharb"
+      }
+    },
+    "node_modules/gauge": {
+      "version": "3.0.2",
+      "resolved": "https://registry.npmjs.org/gauge/-/gauge-3.0.2.tgz",
+      "integrity": "sha512-+5J6MS/5XksCuXq++uFRsnUd7Ovu1XenbeuIuNRJxYWjgQbPuFhT14lAvsWfqfAmnwluf1OwMjz39HjfLPci0Q==",
+      "deprecated": "This package is no longer supported.",
+      "license": "ISC",
+      "dependencies": {
+        "aproba": "^1.0.3 || ^2.0.0",
+        "color-support": "^1.1.2",
+        "console-control-strings": "^1.0.0",
+        "has-unicode": "^2.0.1",
+        "object-assign": "^4.1.1",
+        "signal-exit": "^3.0.0",
+        "string-width": "^4.2.3",
+        "strip-ansi": "^6.0.1",
+        "wide-align": "^1.1.2"
+      },
+      "engines": {
+        "node": ">=10"
+      }
+    },
+    "node_modules/get-intrinsic": {
+      "version": "1.3.0",
+      "resolved": "https://registry.npmjs.org/get-intrinsic/-/get-intrinsic-1.3.0.tgz",
+      "integrity": "sha512-9fSjSaos/fRIVIp+xSJlE6lfwhES7LNtKaCBIamHsjr2na1BiABJPo0mOjjz8GJDURarmCPGqaiVg5mfjb98CQ==",
+      "license": "MIT",
+      "dependencies": {
+        "call-bind-apply-helpers": "^1.0.2",
+        "es-define-property": "^1.0.1",
+        "es-errors": "^1.3.0",
+        "es-object-atoms": "^1.1.1",
+        "function-bind": "^1.1.2",
+        "get-proto": "^1.0.1",
+        "gopd": "^1.2.0",
+        "has-symbols": "^1.1.0",
+        "hasown": "^2.0.2",
+        "math-intrinsics": "^1.1.0"
+      },
+      "engines": {
+        "node": ">= 0.4"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/ljharb"
+      }
+    },
+    "node_modules/get-proto": {
+      "version": "1.0.1",
+      "resolved": "https://registry.npmjs.org/get-proto/-/get-proto-1.0.1.tgz",
+      "integrity": "sha512-sTSfBjoXBp89JvIKIefqw7U2CCebsc74kiY6awiGogKtoSGbgjYE/G/+l9sF3MWFPNc9IcoOC4ODfKHfxFmp0g==",
+      "license": "MIT",
+      "dependencies": {
+        "dunder-proto": "^1.0.1",
+        "es-object-atoms": "^1.0.0"
+      },
+      "engines": {
+        "node": ">= 0.4"
+      }
+    },
+    "node_modules/get-tsconfig": {
+      "version": "4.13.6",
+      "resolved": "https://registry.npmjs.org/get-tsconfig/-/get-tsconfig-4.13.6.tgz",
+      "integrity": "sha512-shZT/QMiSHc/YBLxxOkMtgSid5HFoauqCE3/exfsEcwg1WkeqjG+V40yBbBrsD+jW2HDXcs28xOfcbm2jI8Ddw==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "resolve-pkg-maps": "^1.0.0"
+      },
+      "funding": {
+        "url": "https://github.com/privatenumber/get-tsconfig?sponsor=1"
+      }
+    },
+    "node_modules/glob": {
+      "version": "7.2.3",
+      "resolved": "https://registry.npmjs.org/glob/-/glob-7.2.3.tgz",
+      "integrity": "sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q==",
+      "deprecated": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me",
+      "license": "ISC",
+      "dependencies": {
+        "fs.realpath": "^1.0.0",
+        "inflight": "^1.0.4",
+        "inherits": "2",
+        "minimatch": "^3.1.1",
+        "once": "^1.3.0",
+        "path-is-absolute": "^1.0.0"
+      },
+      "engines": {
+        "node": "*"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/isaacs"
+      }
+    },
+    "node_modules/gopd": {
+      "version": "1.2.0",
+      "resolved": "https://registry.npmjs.org/gopd/-/gopd-1.2.0.tgz",
+      "integrity": "sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.4"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/ljharb"
+      }
+    },
+    "node_modules/has-symbols": {
+      "version": "1.1.0",
+      "resolved": "https://registry.npmjs.org/has-symbols/-/has-symbols-1.1.0.tgz",
+      "integrity": "sha512-1cDNdwJ2Jaohmb3sg4OmKaMBwuC48sYni5HUw2DvsC8LjGTLK9h+eb1X6RyuOHe4hT0ULCW68iomhjUoKUqlPQ==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.4"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/ljharb"
+      }
+    },
+    "node_modules/has-unicode": {
+      "version": "2.0.1",
+      "resolved": "https://registry.npmjs.org/has-unicode/-/has-unicode-2.0.1.tgz",
+      "integrity": "sha512-8Rf9Y83NBReMnx0gFzA8JImQACstCYWUplepDa9xprwwtmgEZUF0h/i5xSA625zB/I37EtrswSST6OXxwaaIJQ==",
+      "license": "ISC"
+    },
+    "node_modules/hasown": {
+      "version": "2.0.2",
+      "resolved": "https://registry.npmjs.org/hasown/-/hasown-2.0.2.tgz",
+      "integrity": "sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==",
+      "license": "MIT",
+      "dependencies": {
+        "function-bind": "^1.1.2"
+      },
+      "engines": {
+        "node": ">= 0.4"
+      }
+    },
+    "node_modules/http-errors": {
+      "version": "2.0.1",
+      "resolved": "https://registry.npmjs.org/http-errors/-/http-errors-2.0.1.tgz",
+      "integrity": "sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ==",
+      "license": "MIT",
+      "dependencies": {
+        "depd": "~2.0.0",
+        "inherits": "~2.0.4",
+        "setprototypeof": "~1.2.0",
+        "statuses": "~2.0.2",
+        "toidentifier": "~1.0.1"
+      },
+      "engines": {
+        "node": ">= 0.8"
+      },
+      "funding": {
+        "type": "opencollective",
+        "url": "https://opencollective.com/express"
+      }
+    },
+    "node_modules/https-proxy-agent": {
+      "version": "5.0.1",
+      "resolved": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-5.0.1.tgz",
+      "integrity": "sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA==",
+      "license": "MIT",
+      "dependencies": {
+        "agent-base": "6",
+        "debug": "4"
+      },
+      "engines": {
+        "node": ">= 6"
+      }
+    },
+    "node_modules/iconv-lite": {
+      "version": "0.4.24",
+      "resolved": "https://registry.npmjs.org/iconv-lite/-/iconv-lite-0.4.24.tgz",
+      "integrity": "sha512-v3MXnZAcvnywkTUEZomIActle7RXXeedOR31wwl7VlyoXO4Qi9arvSenNQWne1TcRwhCL1HwLI21bEqdpj8/rA==",
+      "license": "MIT",
+      "dependencies": {
+        "safer-buffer": ">= 2.1.2 < 3"
+      },
+      "engines": {
+        "node": ">=0.10.0"
+      }
+    },
+    "node_modules/inflight": {
+      "version": "1.0.6",
+      "resolved": "https://registry.npmjs.org/inflight/-/inflight-1.0.6.tgz",
+      "integrity": "sha512-k92I/b08q4wvFscXCLvqfsHCrjrF7yiXsQuIVvVE7N82W3+aqpzuUdBbfhWcy/FZR3/4IgflMgKLOsvPDrGCJA==",
+      "deprecated": "This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.",
+      "license": "ISC",
+      "dependencies": {
+        "once": "^1.3.0",
+        "wrappy": "1"
+      }
+    },
+    "node_modules/inherits": {
+      "version": "2.0.4",
+      "resolved": "https://registry.npmjs.org/inherits/-/inherits-2.0.4.tgz",
+      "integrity": "sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==",
+      "license": "ISC"
+    },
+    "node_modules/ipaddr.js": {
+      "version": "1.9.1",
+      "resolved": "https://registry.npmjs.org/ipaddr.js/-/ipaddr.js-1.9.1.tgz",
+      "integrity": "sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.10"
+      }
+    },
+    "node_modules/is-fullwidth-code-point": {
+      "version": "3.0.0",
+      "resolved": "https://registry.npmjs.org/is-fullwidth-code-point/-/is-fullwidth-code-point-3.0.0.tgz",
+      "integrity": "sha512-zymm5+u+sCsSWyD9qNaejV3DFvhCKclKdizYaJUuHA83RLjb7nSuGnddCHGv0hk+KY7BMAlsWeK4Ueg6EV6XQg==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=8"
+      }
+    },
+    "node_modules/jsonwebtoken": {
+      "version": "9.0.3",
+      "resolved": "https://registry.npmjs.org/jsonwebtoken/-/jsonwebtoken-9.0.3.tgz",
+      "integrity": "sha512-MT/xP0CrubFRNLNKvxJ2BYfy53Zkm++5bX9dtuPbqAeQpTVe0MQTFhao8+Cp//EmJp244xt6Drw/GVEGCUj40g==",
+      "license": "MIT",
+      "dependencies": {
+        "jws": "^4.0.1",
+        "lodash.includes": "^4.3.0",
+        "lodash.isboolean": "^3.0.3",
+        "lodash.isinteger": "^4.0.4",
+        "lodash.isnumber": "^3.0.3",
+        "lodash.isplainobject": "^4.0.6",
+        "lodash.isstring": "^4.0.1",
+        "lodash.once": "^4.0.0",
+        "ms": "^2.1.1",
+        "semver": "^7.5.4"
+      },
+      "engines": {
+        "node": ">=12",
+        "npm": ">=6"
+      }
+    },
+    "node_modules/jwa": {
+      "version": "2.0.1",
+      "resolved": "https://registry.npmjs.org/jwa/-/jwa-2.0.1.tgz",
+      "integrity": "sha512-hRF04fqJIP8Abbkq5NKGN0Bbr3JxlQ+qhZufXVr0DvujKy93ZCbXZMHDL4EOtodSbCWxOqR8MS1tXA5hwqCXDg==",
+      "license": "MIT",
+      "dependencies": {
+        "buffer-equal-constant-time": "^1.0.1",
+        "ecdsa-sig-formatter": "1.0.11",
+        "safe-buffer": "^5.0.1"
+      }
+    },
+    "node_modules/jws": {
+      "version": "4.0.1",
+      "resolved": "https://registry.npmjs.org/jws/-/jws-4.0.1.tgz",
+      "integrity": "sha512-EKI/M/yqPncGUUh44xz0PxSidXFr/+r0pA70+gIYhjv+et7yxM+s29Y+VGDkovRofQem0fs7Uvf4+YmAdyRduA==",
+      "license": "MIT",
+      "dependencies": {
+        "jwa": "^2.0.1",
+        "safe-buffer": "^5.0.1"
+      }
+    },
+    "node_modules/lodash": {
+      "version": "4.17.21",
+      "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz",
+      "integrity": "sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==",
+      "license": "MIT"
+    },
+    "node_modules/lodash.includes": {
+      "version": "4.3.0",
+      "resolved": "https://registry.npmjs.org/lodash.includes/-/lodash.includes-4.3.0.tgz",
+      "integrity": "sha512-W3Bx6mdkRTGtlJISOvVD/lbqjTlPPUDTMnlXZFnVwi9NKJ6tiAk6LVdlhZMm17VZisqhKcgzpO5Wz91PCt5b0w==",
+      "license": "MIT"
+    },
+    "node_modules/lodash.isboolean": {
+      "version": "3.0.3",
+      "resolved": "https://registry.npmjs.org/lodash.isboolean/-/lodash.isboolean-3.0.3.tgz",
+      "integrity": "sha512-Bz5mupy2SVbPHURB98VAcw+aHh4vRV5IPNhILUCsOzRmsTmSQ17jIuqopAentWoehktxGd9e/hbIXq980/1QJg==",
+      "license": "MIT"
+    },
+    "node_modules/lodash.isinteger": {
+      "version": "4.0.4",
+      "resolved": "https://registry.npmjs.org/lodash.isinteger/-/lodash.isinteger-4.0.4.tgz",
+      "integrity": "sha512-DBwtEWN2caHQ9/imiNeEA5ys1JoRtRfY3d7V9wkqtbycnAmTvRRmbHKDV4a0EYc678/dia0jrte4tjYwVBaZUA==",
+      "license": "MIT"
+    },
+    "node_modules/lodash.isnumber": {
+      "version": "3.0.3",
+      "resolved": "https://registry.npmjs.org/lodash.isnumber/-/lodash.isnumber-3.0.3.tgz",
+      "integrity": "sha512-QYqzpfwO3/CWf3XP+Z+tkQsfaLL/EnUlXWVkIk5FUPc4sBdTehEqZONuyRt2P67PXAk+NXmTBcc97zw9t1FQrw==",
+      "license": "MIT"
+    },
+    "node_modules/lodash.isplainobject": {
+      "version": "4.0.6",
+      "resolved": "https://registry.npmjs.org/lodash.isplainobject/-/lodash.isplainobject-4.0.6.tgz",
+      "integrity": "sha512-oSXzaWypCMHkPC3NvBEaPHf0KsA5mvPrOPgQWDsbg8n7orZ290M0BmC/jgRZ4vcJ6DTAhjrsSYgdsW/F+MFOBA==",
+      "license": "MIT"
+    },
+    "node_modules/lodash.isstring": {
+      "version": "4.0.1",
+      "resolved": "https://registry.npmjs.org/lodash.isstring/-/lodash.isstring-4.0.1.tgz",
+      "integrity": "sha512-0wJxfxH1wgO3GrbuP+dTTk7op+6L41QCXbGINEmD+ny/G/eCqGzxyCsh7159S+mgDDcoarnBw6PC1PS5+wUGgw==",
+      "license": "MIT"
+    },
+    "node_modules/lodash.once": {
+      "version": "4.1.1",
+      "resolved": "https://registry.npmjs.org/lodash.once/-/lodash.once-4.1.1.tgz",
+      "integrity": "sha512-Sb487aTOCr9drQVL8pIxOzVhafOjZN9UU54hiN8PU3uAiSV7lx1yYNpbNmex2PK6dSJoNTSJUUswT651yww3Mg==",
+      "license": "MIT"
+    },
+    "node_modules/make-dir": {
+      "version": "3.1.0",
+      "resolved": "https://registry.npmjs.org/make-dir/-/make-dir-3.1.0.tgz",
+      "integrity": "sha512-g3FeP20LNwhALb/6Cz6Dd4F2ngze0jz7tbzrD2wAV+o9FeNHe4rL+yK2md0J/fiSf1sa1ADhXqi5+oVwOM/eGw==",
+      "license": "MIT",
+      "dependencies": {
+        "semver": "^6.0.0"
+      },
+      "engines": {
+        "node": ">=8"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/sindresorhus"
+      }
+    },
+    "node_modules/make-dir/node_modules/semver": {
+      "version": "6.3.1",
+      "resolved": "https://registry.npmjs.org/semver/-/semver-6.3.1.tgz",
+      "integrity": "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==",
+      "license": "ISC",
+      "bin": {
+        "semver": "bin/semver.js"
+      }
+    },
+    "node_modules/make-error": {
+      "version": "1.3.6",
+      "resolved": "https://registry.npmjs.org/make-error/-/make-error-1.3.6.tgz",
+      "integrity": "sha512-s8UhlNe7vPKomQhC1qFelMokr/Sc3AgNbso3n74mVPA5LTZwkB9NlXf4XPamLxJE8h0gh73rM94xvwRT2CVInw==",
+      "dev": true,
+      "license": "ISC"
+    },
+    "node_modules/math-intrinsics": {
+      "version": "1.1.0",
+      "resolved": "https://registry.npmjs.org/math-intrinsics/-/math-intrinsics-1.1.0.tgz",
+      "integrity": "sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.4"
+      }
+    },
+    "node_modules/media-typer": {
+      "version": "0.3.0",
+      "resolved": "https://registry.npmjs.org/media-typer/-/media-typer-0.3.0.tgz",
+      "integrity": "sha512-dq+qelQ9akHpcOl/gUVRTxVIOkAJ1wR3QAvb4RsVjS8oVoFjDGTc679wJYmUmknUF5HwMLOgb5O+a3KxfWapPQ==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/merge-descriptors": {
+      "version": "1.0.3",
+      "resolved": "https://registry.npmjs.org/merge-descriptors/-/merge-descriptors-1.0.3.tgz",
+      "integrity": "sha512-gaNvAS7TZ897/rVaZ0nMtAyxNyi/pdbjbAwUpFQpN70GqnVfOiXpeUUMKRBmzXaSQ8DdTX4/0ms62r2K+hE6mQ==",
+      "license": "MIT",
+      "funding": {
+        "url": "https://github.com/sponsors/sindresorhus"
+      }
+    },
+    "node_modules/methods": {
+      "version": "1.1.2",
+      "resolved": "https://registry.npmjs.org/methods/-/methods-1.1.2.tgz",
+      "integrity": "sha512-iclAHeNqNm68zFtnZ0e+1L2yUIdvzNoauKU4WBA3VvH/vPFieF7qfRlwUZU+DA9P9bPXIS90ulxoUoCH23sV2w==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/mime": {
+      "version": "1.6.0",
+      "resolved": "https://registry.npmjs.org/mime/-/mime-1.6.0.tgz",
+      "integrity": "sha512-x0Vn8spI+wuJ1O6S7gnbaQg8Pxh4NNHb7KSINmEWKiPE4RKOplvijn+NkmYmmRgP68mc70j2EbeTFRsrswaQeg==",
+      "license": "MIT",
+      "bin": {
+        "mime": "cli.js"
+      },
+      "engines": {
+        "node": ">=4"
+      }
+    },
+    "node_modules/mime-db": {
+      "version": "1.52.0",
+      "resolved": "https://registry.npmjs.org/mime-db/-/mime-db-1.52.0.tgz",
+      "integrity": "sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/mime-types": {
+      "version": "2.1.35",
+      "resolved": "https://registry.npmjs.org/mime-types/-/mime-types-2.1.35.tgz",
+      "integrity": "sha512-ZDY+bPm5zTTF+YpCrAU9nK0UgICYPT0QtT1NZWFv4s++TNkcgVaT0g6+4R2uI4MjQjzysHB1zxuWL50hzaeXiw==",
+      "license": "MIT",
+      "dependencies": {
+        "mime-db": "1.52.0"
+      },
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/minimatch": {
+      "version": "3.1.2",
+      "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-3.1.2.tgz",
+      "integrity": "sha512-J7p63hRiAjw1NDEww1W7i37+ByIrOWO5XQQAzZ3VOcL0PNybwpfmV/N05zFAzwQ9USyEcX6t3UO+K5aqBQOIHw==",
+      "license": "ISC",
+      "dependencies": {
+        "brace-expansion": "^1.1.7"
+      },
+      "engines": {
+        "node": "*"
+      }
+    },
+    "node_modules/minipass": {
+      "version": "5.0.0",
+      "resolved": "https://registry.npmjs.org/minipass/-/minipass-5.0.0.tgz",
+      "integrity": "sha512-3FnjYuehv9k6ovOEbyOswadCDPX1piCfhV8ncmYtHOjuPwylVWsghTLo7rabjC3Rx5xD4HDx8Wm1xnMF7S5qFQ==",
+      "license": "ISC",
+      "engines": {
+        "node": ">=8"
+      }
+    },
+    "node_modules/minizlib": {
+      "version": "2.1.2",
+      "resolved": "https://registry.npmjs.org/minizlib/-/minizlib-2.1.2.tgz",
+      "integrity": "sha512-bAxsR8BVfj60DWXHE3u30oHzfl4G7khkSuPW+qvpd7jFRHm7dLxOjUk1EHACJ/hxLY8phGJ0YhYHZo7jil7Qdg==",
+      "license": "MIT",
+      "dependencies": {
+        "minipass": "^3.0.0",
+        "yallist": "^4.0.0"
+      },
+      "engines": {
+        "node": ">= 8"
+      }
+    },
+    "node_modules/minizlib/node_modules/minipass": {
+      "version": "3.3.6",
+      "resolved": "https://registry.npmjs.org/minipass/-/minipass-3.3.6.tgz",
+      "integrity": "sha512-DxiNidxSEK+tHG6zOIklvNOwm3hvCrbUrdtzY74U6HKTJxvIDfOUL5W5P2Ghd3DTkhhKPYGqeNUIh5qcM4YBfw==",
+      "license": "ISC",
+      "dependencies": {
+        "yallist": "^4.0.0"
+      },
+      "engines": {
+        "node": ">=8"
+      }
+    },
+    "node_modules/mkdirp": {
+      "version": "1.0.4",
+      "resolved": "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.4.tgz",
+      "integrity": "sha512-vVqVZQyf3WLx2Shd0qJ9xuvqgAyKPLAiqITEtqW0oIUjzo3PePDd6fW9iFz30ef7Ysp/oiWqbhszeGWW2T6Gzw==",
+      "license": "MIT",
+      "bin": {
+        "mkdirp": "bin/cmd.js"
+      },
+      "engines": {
+        "node": ">=10"
+      }
+    },
+    "node_modules/ms": {
+      "version": "2.1.3",
+      "resolved": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
+      "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
+      "license": "MIT"
+    },
+    "node_modules/negotiator": {
+      "version": "0.6.3",
+      "resolved": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.3.tgz",
+      "integrity": "sha512-+EUsqGPLsM+j/zdChZjsnX51g4XrHFOIXwfnCVPGlQk/k5giakcKsuxCObBRu6DSm9opw/O6slWbJdghQM4bBg==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/node-addon-api": {
+      "version": "5.1.0",
+      "resolved": "https://registry.npmjs.org/node-addon-api/-/node-addon-api-5.1.0.tgz",
+      "integrity": "sha512-eh0GgfEkpnoWDq+VY8OyvYhFEzBk6jIYbRKdIlyTiAXIVJ8PyBaKb0rp7oDtoddbdoHWhq8wwr+XZ81F1rpNdA==",
+      "license": "MIT"
+    },
+    "node_modules/node-fetch": {
+      "version": "2.7.0",
+      "resolved": "https://registry.npmjs.org/node-fetch/-/node-fetch-2.7.0.tgz",
+      "integrity": "sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==",
+      "license": "MIT",
+      "dependencies": {
+        "whatwg-url": "^5.0.0"
+      },
+      "engines": {
+        "node": "4.x || >=6.0.0"
+      },
+      "peerDependencies": {
+        "encoding": "^0.1.0"
+      },
+      "peerDependenciesMeta": {
+        "encoding": {
+          "optional": true
+        }
+      }
+    },
+    "node_modules/nodemailer": {
+      "version": "6.10.1",
+      "resolved": "https://registry.npmjs.org/nodemailer/-/nodemailer-6.10.1.tgz",
+      "integrity": "sha512-Z+iLaBGVaSjbIzQ4pX6XV41HrooLsQ10ZWPUehGmuantvzWoDVBnmsdUcOIDM1t+yPor5pDhVlDESgOMEGxhHA==",
+      "license": "MIT-0",
+      "engines": {
+        "node": ">=6.0.0"
+      }
+    },
+    "node_modules/nopt": {
+      "version": "5.0.0",
+      "resolved": "https://registry.npmjs.org/nopt/-/nopt-5.0.0.tgz",
+      "integrity": "sha512-Tbj67rffqceeLpcRXrT7vKAN8CwfPeIBgM7E6iBkmKLV7bEMwpGgYLGv0jACUsECaa/vuxP0IjEont6umdMgtQ==",
+      "license": "ISC",
+      "dependencies": {
+        "abbrev": "1"
+      },
+      "bin": {
+        "nopt": "bin/nopt.js"
+      },
+      "engines": {
+        "node": ">=6"
+      }
+    },
+    "node_modules/npmlog": {
+      "version": "5.0.1",
+      "resolved": "https://registry.npmjs.org/npmlog/-/npmlog-5.0.1.tgz",
+      "integrity": "sha512-AqZtDUWOMKs1G/8lwylVjrdYgqA4d9nu8hc+0gzRxlDb1I10+FHBGMXs6aiQHFdCUUlqH99MUMuLfzWDNDtfxw==",
+      "deprecated": "This package is no longer supported.",
+      "license": "ISC",
+      "dependencies": {
+        "are-we-there-yet": "^2.0.0",
+        "console-control-strings": "^1.1.0",
+        "gauge": "^3.0.0",
+        "set-blocking": "^2.0.0"
+      }
+    },
+    "node_modules/object-assign": {
+      "version": "4.1.1",
+      "resolved": "https://registry.npmjs.org/object-assign/-/object-assign-4.1.1.tgz",
+      "integrity": "sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=0.10.0"
+      }
+    },
+    "node_modules/object-inspect": {
+      "version": "1.13.4",
+      "resolved": "https://registry.npmjs.org/object-inspect/-/object-inspect-1.13.4.tgz",
+      "integrity": "sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.4"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/ljharb"
+      }
+    },
+    "node_modules/on-finished": {
+      "version": "2.4.1",
+      "resolved": "https://registry.npmjs.org/on-finished/-/on-finished-2.4.1.tgz",
+      "integrity": "sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg==",
+      "license": "MIT",
+      "dependencies": {
+        "ee-first": "1.1.1"
+      },
+      "engines": {
+        "node": ">= 0.8"
+      }
+    },
+    "node_modules/once": {
+      "version": "1.4.0",
+      "resolved": "https://registry.npmjs.org/once/-/once-1.4.0.tgz",
+      "integrity": "sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==",
+      "license": "ISC",
+      "dependencies": {
+        "wrappy": "1"
+      }
+    },
+    "node_modules/parseurl": {
+      "version": "1.3.3",
+      "resolved": "https://registry.npmjs.org/parseurl/-/parseurl-1.3.3.tgz",
+      "integrity": "sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.8"
+      }
+    },
+    "node_modules/path-is-absolute": {
+      "version": "1.0.1",
+      "resolved": "https://registry.npmjs.org/path-is-absolute/-/path-is-absolute-1.0.1.tgz",
+      "integrity": "sha512-AVbw3UJ2e9bq64vSaS9Am0fje1Pa8pbGqTTsmXfaIiMpnr5DlDhfJOuLj9Sf95ZPVDAUerDfEk88MPmPe7UCQg==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=0.10.0"
+      }
+    },
+    "node_modules/path-to-regexp": {
+      "version": "0.1.12",
+      "resolved": "https://registry.npmjs.org/path-to-regexp/-/path-to-regexp-0.1.12.tgz",
+      "integrity": "sha512-RA1GjUVMnvYFxuqovrEqZoxxW5NUZqbwKtYz/Tt7nXerk0LbLblQmrsgdeOxV5SFHf0UDggjS/bSeOZwt1pmEQ==",
+      "license": "MIT"
+    },
+    "node_modules/pg": {
+      "version": "8.18.0",
+      "resolved": "https://registry.npmjs.org/pg/-/pg-8.18.0.tgz",
+      "integrity": "sha512-xqrUDL1b9MbkydY/s+VZ6v+xiMUmOUk7SS9d/1kpyQxoJ6U9AO1oIJyUWVZojbfe5Cc/oluutcgFG4L9RDP1iQ==",
+      "license": "MIT",
+      "dependencies": {
+        "pg-connection-string": "^2.11.0",
+        "pg-pool": "^3.11.0",
+        "pg-protocol": "^1.11.0",
+        "pg-types": "2.2.0",
+        "pgpass": "1.0.5"
+      },
+      "engines": {
+        "node": ">= 16.0.0"
+      },
+      "optionalDependencies": {
+        "pg-cloudflare": "^1.3.0"
+      },
+      "peerDependencies": {
+        "pg-native": ">=3.0.1"
+      },
+      "peerDependenciesMeta": {
+        "pg-native": {
+          "optional": true
+        }
+      }
+    },
+    "node_modules/pg-cloudflare": {
+      "version": "1.3.0",
+      "resolved": "https://registry.npmjs.org/pg-cloudflare/-/pg-cloudflare-1.3.0.tgz",
+      "integrity": "sha512-6lswVVSztmHiRtD6I8hw4qP/nDm1EJbKMRhf3HCYaqud7frGysPv7FYJ5noZQdhQtN2xJnimfMtvQq21pdbzyQ==",
+      "license": "MIT",
+      "optional": true
+    },
+    "node_modules/pg-connection-string": {
+      "version": "2.11.0",
+      "resolved": "https://registry.npmjs.org/pg-connection-string/-/pg-connection-string-2.11.0.tgz",
+      "integrity": "sha512-kecgoJwhOpxYU21rZjULrmrBJ698U2RxXofKVzOn5UDj61BPj/qMb7diYUR1nLScCDbrztQFl1TaQZT0t1EtzQ==",
+      "license": "MIT"
+    },
+    "node_modules/pg-int8": {
+      "version": "1.0.1",
+      "resolved": "https://registry.npmjs.org/pg-int8/-/pg-int8-1.0.1.tgz",
+      "integrity": "sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==",
+      "license": "ISC",
+      "engines": {
+        "node": ">=4.0.0"
+      }
+    },
+    "node_modules/pg-pool": {
+      "version": "3.11.0",
+      "resolved": "https://registry.npmjs.org/pg-pool/-/pg-pool-3.11.0.tgz",
+      "integrity": "sha512-MJYfvHwtGp870aeusDh+hg9apvOe2zmpZJpyt+BMtzUWlVqbhFmMK6bOBXLBUPd7iRtIF9fZplDc7KrPN3PN7w==",
+      "license": "MIT",
+      "peerDependencies": {
+        "pg": ">=8.0"
+      }
+    },
+    "node_modules/pg-protocol": {
+      "version": "1.11.0",
+      "resolved": "https://registry.npmjs.org/pg-protocol/-/pg-protocol-1.11.0.tgz",
+      "integrity": "sha512-pfsxk2M9M3BuGgDOfuy37VNRRX3jmKgMjcvAcWqNDpZSf4cUmv8HSOl5ViRQFsfARFn0KuUQTgLxVMbNq5NW3g==",
+      "license": "MIT"
+    },
+    "node_modules/pg-types": {
+      "version": "2.2.0",
+      "resolved": "https://registry.npmjs.org/pg-types/-/pg-types-2.2.0.tgz",
+      "integrity": "sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==",
+      "license": "MIT",
+      "dependencies": {
+        "pg-int8": "1.0.1",
+        "postgres-array": "~2.0.0",
+        "postgres-bytea": "~1.0.0",
+        "postgres-date": "~1.0.4",
+        "postgres-interval": "^1.1.0"
+      },
+      "engines": {
+        "node": ">=4"
+      }
+    },
+    "node_modules/pgpass": {
+      "version": "1.0.5",
+      "resolved": "https://registry.npmjs.org/pgpass/-/pgpass-1.0.5.tgz",
+      "integrity": "sha512-FdW9r/jQZhSeohs1Z3sI1yxFQNFvMcnmfuj4WBMUTxOrAyLMaTcE1aAMBiTlbMNaXvBCQuVi0R7hd8udDSP7ug==",
+      "license": "MIT",
+      "dependencies": {
+        "split2": "^4.1.0"
+      }
+    },
+    "node_modules/postgres-array": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/postgres-array/-/postgres-array-2.0.0.tgz",
+      "integrity": "sha512-VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=4"
+      }
+    },
+    "node_modules/postgres-bytea": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/postgres-bytea/-/postgres-bytea-1.0.0.tgz",
+      "integrity": "sha512-xy3pmLuQqRBZBXDULy7KbaitYqLcmxigw14Q5sj8QBVLqEwXfeybIKVWiqAXTlcvdvb0+xkOtDbfQMOf4lST1w==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=0.10.0"
+      }
+    },
+    "node_modules/postgres-date": {
+      "version": "1.0.7",
+      "resolved": "https://registry.npmjs.org/postgres-date/-/postgres-date-1.0.7.tgz",
+      "integrity": "sha512-suDmjLVQg78nMK2UZ454hAG+OAW+HQPZ6n++TNDUX+L0+uUlLywnoxJKDou51Zm+zTCjrCl0Nq6J9C5hP9vK/Q==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=0.10.0"
+      }
+    },
+    "node_modules/postgres-interval": {
+      "version": "1.2.0",
+      "resolved": "https://registry.npmjs.org/postgres-interval/-/postgres-interval-1.2.0.tgz",
+      "integrity": "sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ==",
+      "license": "MIT",
+      "dependencies": {
+        "xtend": "^4.0.0"
+      },
+      "engines": {
+        "node": ">=0.10.0"
+      }
+    },
+    "node_modules/proxy-addr": {
+      "version": "2.0.7",
+      "resolved": "https://registry.npmjs.org/proxy-addr/-/proxy-addr-2.0.7.tgz",
+      "integrity": "sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg==",
+      "license": "MIT",
+      "dependencies": {
+        "forwarded": "0.2.0",
+        "ipaddr.js": "1.9.1"
+      },
+      "engines": {
+        "node": ">= 0.10"
+      }
+    },
+    "node_modules/qs": {
+      "version": "6.14.2",
+      "resolved": "https://registry.npmjs.org/qs/-/qs-6.14.2.tgz",
+      "integrity": "sha512-V/yCWTTF7VJ9hIh18Ugr2zhJMP01MY7c5kh4J870L7imm6/DIzBsNLTXzMwUA3yZ5b/KBqLx8Kp3uRvd7xSe3Q==",
+      "license": "BSD-3-Clause",
+      "dependencies": {
+        "side-channel": "^1.1.0"
+      },
+      "engines": {
+        "node": ">=0.6"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/ljharb"
+      }
+    },
+    "node_modules/range-parser": {
+      "version": "1.2.1",
+      "resolved": "https://registry.npmjs.org/range-parser/-/range-parser-1.2.1.tgz",
+      "integrity": "sha512-Hrgsx+orqoygnmhFbKaHE6c296J+HTAQXoxEF6gNupROmmGJRoyzfG3ccAveqCBrwr/2yxQ5BVd/GTl5agOwSg==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/raw-body": {
+      "version": "2.5.3",
+      "resolved": "https://registry.npmjs.org/raw-body/-/raw-body-2.5.3.tgz",
+      "integrity": "sha512-s4VSOf6yN0rvbRZGxs8Om5CWj6seneMwK3oDb4lWDH0UPhWcxwOWw5+qk24bxq87szX1ydrwylIOp2uG1ojUpA==",
+      "license": "MIT",
+      "dependencies": {
+        "bytes": "~3.1.2",
+        "http-errors": "~2.0.1",
+        "iconv-lite": "~0.4.24",
+        "unpipe": "~1.0.0"
+      },
+      "engines": {
+        "node": ">= 0.8"
+      }
+    },
+    "node_modules/readable-stream": {
+      "version": "3.6.2",
+      "resolved": "https://registry.npmjs.org/readable-stream/-/readable-stream-3.6.2.tgz",
+      "integrity": "sha512-9u/sniCrY3D5WdsERHzHE4G2YCXqoG5FTHUiCC4SIbr6XcLZBY05ya9EKjYek9O5xOAwjGq+1JdGBAS7Q9ScoA==",
+      "license": "MIT",
+      "dependencies": {
+        "inherits": "^2.0.3",
+        "string_decoder": "^1.1.1",
+        "util-deprecate": "^1.0.1"
+      },
+      "engines": {
+        "node": ">= 6"
+      }
+    },
+    "node_modules/resolve-pkg-maps": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/resolve-pkg-maps/-/resolve-pkg-maps-1.0.0.tgz",
+      "integrity": "sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw==",
+      "dev": true,
+      "license": "MIT",
+      "funding": {
+        "url": "https://github.com/privatenumber/resolve-pkg-maps?sponsor=1"
+      }
+    },
+    "node_modules/rimraf": {
+      "version": "3.0.2",
+      "resolved": "https://registry.npmjs.org/rimraf/-/rimraf-3.0.2.tgz",
+      "integrity": "sha512-JZkJMZkAGFFPP2YqXZXPbMlMBgsxzE8ILs4lMIX/2o0L9UBw9O/Y3o6wFw/i9YLapcUJWwqbi3kdxIPdC62TIA==",
+      "deprecated": "Rimraf versions prior to v4 are no longer supported",
+      "license": "ISC",
+      "dependencies": {
+        "glob": "^7.1.3"
+      },
+      "bin": {
+        "rimraf": "bin.js"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/isaacs"
+      }
+    },
+    "node_modules/safe-buffer": {
+      "version": "5.2.1",
+      "resolved": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.2.1.tgz",
+      "integrity": "sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==",
+      "funding": [
+        {
+          "type": "github",
+          "url": "https://github.com/sponsors/feross"
+        },
+        {
+          "type": "patreon",
+          "url": "https://www.patreon.com/feross"
+        },
+        {
+          "type": "consulting",
+          "url": "https://feross.org/support"
+        }
+      ],
+      "license": "MIT"
+    },
+    "node_modules/safer-buffer": {
+      "version": "2.1.2",
+      "resolved": "https://registry.npmjs.org/safer-buffer/-/safer-buffer-2.1.2.tgz",
+      "integrity": "sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==",
+      "license": "MIT"
+    },
+    "node_modules/semver": {
+      "version": "7.7.2",
+      "resolved": "https://registry.npmjs.org/semver/-/semver-7.7.2.tgz",
+      "integrity": "sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==",
+      "license": "ISC",
+      "bin": {
+        "semver": "bin/semver.js"
+      },
+      "engines": {
+        "node": ">=10"
+      }
+    },
+    "node_modules/send": {
+      "version": "0.19.2",
+      "resolved": "https://registry.npmjs.org/send/-/send-0.19.2.tgz",
+      "integrity": "sha512-VMbMxbDeehAxpOtWJXlcUS5E8iXh6QmN+BkRX1GARS3wRaXEEgzCcB10gTQazO42tpNIya8xIyNx8fll1OFPrg==",
+      "license": "MIT",
+      "dependencies": {
+        "debug": "2.6.9",
+        "depd": "2.0.0",
+        "destroy": "1.2.0",
+        "encodeurl": "~2.0.0",
+        "escape-html": "~1.0.3",
+        "etag": "~1.8.1",
+        "fresh": "~0.5.2",
+        "http-errors": "~2.0.1",
+        "mime": "1.6.0",
+        "ms": "2.1.3",
+        "on-finished": "~2.4.1",
+        "range-parser": "~1.2.1",
+        "statuses": "~2.0.2"
+      },
+      "engines": {
+        "node": ">= 0.8.0"
+      }
+    },
+    "node_modules/send/node_modules/debug": {
+      "version": "2.6.9",
+      "resolved": "https://registry.npmjs.org/debug/-/debug-2.6.9.tgz",
+      "integrity": "sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==",
+      "license": "MIT",
+      "dependencies": {
+        "ms": "2.0.0"
+      }
+    },
+    "node_modules/send/node_modules/debug/node_modules/ms": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz",
+      "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==",
+      "license": "MIT"
+    },
+    "node_modules/serve-static": {
+      "version": "1.16.3",
+      "resolved": "https://registry.npmjs.org/serve-static/-/serve-static-1.16.3.tgz",
+      "integrity": "sha512-x0RTqQel6g5SY7Lg6ZreMmsOzncHFU7nhnRWkKgWuMTu5NN0DR5oruckMqRvacAN9d5w6ARnRBXl9xhDCgfMeA==",
+      "license": "MIT",
+      "dependencies": {
+        "encodeurl": "~2.0.0",
+        "escape-html": "~1.0.3",
+        "parseurl": "~1.3.3",
+        "send": "~0.19.1"
+      },
+      "engines": {
+        "node": ">= 0.8.0"
+      }
+    },
+    "node_modules/set-blocking": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/set-blocking/-/set-blocking-2.0.0.tgz",
+      "integrity": "sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw==",
+      "license": "ISC"
+    },
+    "node_modules/setprototypeof": {
+      "version": "1.2.0",
+      "resolved": "https://registry.npmjs.org/setprototypeof/-/setprototypeof-1.2.0.tgz",
+      "integrity": "sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==",
+      "license": "ISC"
+    },
+    "node_modules/side-channel": {
+      "version": "1.1.0",
+      "resolved": "https://registry.npmjs.org/side-channel/-/side-channel-1.1.0.tgz",
+      "integrity": "sha512-ZX99e6tRweoUXqR+VBrslhda51Nh5MTQwou5tnUDgbtyM0dBgmhEDtWGP/xbKn6hqfPRHujUNwz5fy/wbbhnpw==",
+      "license": "MIT",
+      "dependencies": {
+        "es-errors": "^1.3.0",
+        "object-inspect": "^1.13.3",
+        "side-channel-list": "^1.0.0",
+        "side-channel-map": "^1.0.1",
+        "side-channel-weakmap": "^1.0.2"
+      },
+      "engines": {
+        "node": ">= 0.4"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/ljharb"
+      }
+    },
+    "node_modules/side-channel-list": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/side-channel-list/-/side-channel-list-1.0.0.tgz",
+      "integrity": "sha512-FCLHtRD/gnpCiCHEiJLOwdmFP+wzCmDEkc9y7NsYxeF4u7Btsn1ZuwgwJGxImImHicJArLP4R0yX4c2KCrMrTA==",
+      "license": "MIT",
+      "dependencies": {
+        "es-errors": "^1.3.0",
+        "object-inspect": "^1.13.3"
+      },
+      "engines": {
+        "node": ">= 0.4"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/ljharb"
+      }
+    },
+    "node_modules/side-channel-map": {
+      "version": "1.0.1",
+      "resolved": "https://registry.npmjs.org/side-channel-map/-/side-channel-map-1.0.1.tgz",
+      "integrity": "sha512-VCjCNfgMsby3tTdo02nbjtM/ewra6jPHmpThenkTYh8pG9ucZ/1P8So4u4FGBek/BjpOVsDCMoLA/iuBKIFXRA==",
+      "license": "MIT",
+      "dependencies": {
+        "call-bound": "^1.0.2",
+        "es-errors": "^1.3.0",
+        "get-intrinsic": "^1.2.5",
+        "object-inspect": "^1.13.3"
+      },
+      "engines": {
+        "node": ">= 0.4"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/ljharb"
+      }
+    },
+    "node_modules/side-channel-weakmap": {
+      "version": "1.0.2",
+      "resolved": "https://registry.npmjs.org/side-channel-weakmap/-/side-channel-weakmap-1.0.2.tgz",
+      "integrity": "sha512-WPS/HvHQTYnHisLo9McqBHOJk2FkHO/tlpvldyrnem4aeQp4hai3gythswg6p01oSoTl58rcpiFAjF2br2Ak2A==",
+      "license": "MIT",
+      "dependencies": {
+        "call-bound": "^1.0.2",
+        "es-errors": "^1.3.0",
+        "get-intrinsic": "^1.2.5",
+        "object-inspect": "^1.13.3",
+        "side-channel-map": "^1.0.1"
+      },
+      "engines": {
+        "node": ">= 0.4"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/ljharb"
+      }
+    },
+    "node_modules/signal-exit": {
+      "version": "3.0.7",
+      "resolved": "https://registry.npmjs.org/signal-exit/-/signal-exit-3.0.7.tgz",
+      "integrity": "sha512-wnD2ZE+l+SPC/uoS0vXeE9L1+0wuaMqKlfz9AMUo38JsyLSBWSFcHR1Rri62LZc12vLr1gb3jl7iwQhgwpAbGQ==",
+      "license": "ISC"
+    },
+    "node_modules/split2": {
+      "version": "4.2.0",
+      "resolved": "https://registry.npmjs.org/split2/-/split2-4.2.0.tgz",
+      "integrity": "sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==",
+      "license": "ISC",
+      "engines": {
+        "node": ">= 10.x"
+      }
+    },
+    "node_modules/statuses": {
+      "version": "2.0.2",
+      "resolved": "https://registry.npmjs.org/statuses/-/statuses-2.0.2.tgz",
+      "integrity": "sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.8"
+      }
+    },
+    "node_modules/streamsearch": {
+      "version": "1.1.0",
+      "resolved": "https://registry.npmjs.org/streamsearch/-/streamsearch-1.1.0.tgz",
+      "integrity": "sha512-Mcc5wHehp9aXz1ax6bZUyY5afg9u2rv5cqQI3mRrYkGC8rW2hM02jWuwjtL++LS5qinSyhj2QfLyNsuc+VsExg==",
+      "engines": {
+        "node": ">=10.0.0"
+      }
+    },
+    "node_modules/string_decoder": {
+      "version": "1.3.0",
+      "resolved": "https://registry.npmjs.org/string_decoder/-/string_decoder-1.3.0.tgz",
+      "integrity": "sha512-hkRX8U1WjJFd8LsDJ2yQ/wWWxaopEsABU1XfkM8A+j0+85JAGppt16cr1Whg6KIbb4okU6Mql6BOj+uup/wKeA==",
+      "license": "MIT",
+      "dependencies": {
+        "safe-buffer": "~5.2.0"
+      }
+    },
+    "node_modules/string-width": {
+      "version": "4.2.3",
+      "resolved": "https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz",
+      "integrity": "sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==",
+      "license": "MIT",
+      "dependencies": {
+        "emoji-regex": "^8.0.0",
+        "is-fullwidth-code-point": "^3.0.0",
+        "strip-ansi": "^6.0.1"
+      },
+      "engines": {
+        "node": ">=8"
+      }
+    },
+    "node_modules/strip-ansi": {
+      "version": "6.0.1",
+      "resolved": "https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz",
+      "integrity": "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==",
+      "license": "MIT",
+      "dependencies": {
+        "ansi-regex": "^5.0.1"
+      },
+      "engines": {
+        "node": ">=8"
+      }
+    },
+    "node_modules/stripe": {
+      "version": "17.7.0",
+      "resolved": "https://registry.npmjs.org/stripe/-/stripe-17.7.0.tgz",
+      "integrity": "sha512-aT2BU9KkizY9SATf14WhhYVv2uOapBWX0OFWF4xvcj1mPaNotlSc2CsxpS4DS46ZueSppmCF5BX1sNYBtwBvfw==",
+      "license": "MIT",
+      "dependencies": {
+        "@types/node": ">=8.1.0",
+        "qs": "^6.11.0"
+      },
+      "engines": {
+        "node": ">=12.*"
+      }
+    },
+    "node_modules/tar": {
+      "version": "6.2.1",
+      "resolved": "https://registry.npmjs.org/tar/-/tar-6.2.1.tgz",
+      "integrity": "sha512-DZ4yORTwrbTj/7MZYq2w+/ZFdI6OZ/f9SFHR+71gIVUZhOQPHzVCLpvRnPgyaMpfWxxk/4ONva3GQSyNIKRv6A==",
+      "deprecated": "Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me",
+      "license": "ISC",
+      "dependencies": {
+        "chownr": "^2.0.0",
+        "fs-minipass": "^2.0.0",
+        "minipass": "^5.0.0",
+        "minizlib": "^2.1.1",
+        "mkdirp": "^1.0.3",
+        "yallist": "^4.0.0"
+      },
+      "engines": {
+        "node": ">=10"
+      }
+    },
+    "node_modules/toidentifier": {
+      "version": "1.0.1",
+      "resolved": "https://registry.npmjs.org/toidentifier/-/toidentifier-1.0.1.tgz",
+      "integrity": "sha512-o5sSPKEkg/DIQNmH43V0/uerLrpzVedkUh8tGNvaeXpfpuwjKenlSox/2O/BTlZUtEe+JG7s5YhEz608PlAHRA==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=0.6"
+      }
+    },
+    "node_modules/tr46": {
+      "version": "0.0.3",
+      "resolved": "https://registry.npmjs.org/tr46/-/tr46-0.0.3.tgz",
+      "integrity": "sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==",
+      "license": "MIT"
+    },
+    "node_modules/ts-node": {
+      "version": "10.9.2",
+      "resolved": "https://registry.npmjs.org/ts-node/-/ts-node-10.9.2.tgz",
+      "integrity": "sha512-f0FFpIdcHgn8zcPSbf1dRevwt047YMnaiJM3u2w2RewrB+fob/zePZcrOyQoLMMO7aBIddLcQIEK5dYjkLnGrQ==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@cspotcode/source-map-support": "^0.8.0",
+        "@tsconfig/node10": "^1.0.7",
+        "@tsconfig/node12": "^1.0.7",
+        "@tsconfig/node14": "^1.0.0",
+        "@tsconfig/node16": "^1.0.2",
+        "acorn": "^8.4.1",
+        "acorn-walk": "^8.1.1",
+        "arg": "^4.1.0",
+        "create-require": "^1.1.0",
+        "diff": "^4.0.1",
+        "make-error": "^1.1.1",
+        "v8-compile-cache-lib": "^3.0.1",
+        "yn": "3.1.1"
+      },
+      "bin": {
+        "ts-node": "dist/bin.js",
+        "ts-node-cwd": "dist/bin-cwd.js",
+        "ts-node-esm": "dist/bin-esm.js",
+        "ts-node-script": "dist/bin-script.js",
+        "ts-node-transpile-only": "dist/bin-transpile.js",
+        "ts-script": "dist/bin-script-deprecated.js"
+      },
+      "peerDependencies": {
+        "@swc/core": ">=1.2.50",
+        "@swc/wasm": ">=1.2.50",
+        "@types/node": "*",
+        "typescript": ">=2.7"
+      },
+      "peerDependenciesMeta": {
+        "@swc/core": {
+          "optional": true
+        },
+        "@swc/wasm": {
+          "optional": true
+        }
+      }
+    },
+    "node_modules/tsx": {
+      "version": "4.21.0",
+      "resolved": "https://registry.npmjs.org/tsx/-/tsx-4.21.0.tgz",
+      "integrity": "sha512-5C1sg4USs1lfG0GFb2RLXsdpXqBSEhAaA/0kPL01wxzpMqLILNxIxIOKiILz+cdg/pLnOUxFYOR5yhHU666wbw==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "esbuild": "~0.27.0",
+        "get-tsconfig": "^4.7.5"
+      },
+      "bin": {
+        "tsx": "dist/cli.mjs"
+      },
+      "engines": {
+        "node": ">=18.0.0"
+      },
+      "optionalDependencies": {
+        "fsevents": "~2.3.3"
+      }
+    },
+    "node_modules/type-is": {
+      "version": "1.6.18",
+      "resolved": "https://registry.npmjs.org/type-is/-/type-is-1.6.18.tgz",
+      "integrity": "sha512-TkRKr9sUTxEH8MdfuCSP7VizJyzRNMjj2J2do2Jr3Kym598JVdEksuzPQCnlFPW4ky9Q+iA+ma9BGm06XQBy8g==",
+      "license": "MIT",
+      "dependencies": {
+        "media-typer": "0.3.0",
+        "mime-types": "~2.1.24"
+      },
+      "engines": {
+        "node": ">= 0.6"
+      }
+    },
+    "node_modules/typescript": {
+      "version": "5.9.3",
+      "resolved": "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz",
+      "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
+      "dev": true,
+      "license": "Apache-2.0",
+      "bin": {
+        "tsc": "bin/tsc",
+        "tsserver": "bin/tsserver"
+      },
+      "engines": {
+        "node": ">=14.17"
+      }
+    },
+    "node_modules/undici-types": {
+      "version": "6.21.0",
+      "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-6.21.0.tgz",
+      "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==",
+      "license": "MIT"
+    },
+    "node_modules/unpipe": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/unpipe/-/unpipe-1.0.0.tgz",
+      "integrity": "sha512-pjy2bYhSsufwWlKwPc+l3cN7+wuJlK6uz0YdJEOlQDbl6jo/YlPi4mb8agUkVC8BF7V8NuzeyPNqRksA3hztKQ==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.8"
+      }
+    },
+    "node_modules/util-deprecate": {
+      "version": "1.0.2",
+      "resolved": "https://registry.npmjs.org/util-deprecate/-/util-deprecate-1.0.2.tgz",
+      "integrity": "sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==",
+      "license": "MIT"
+    },
+    "node_modules/utils-merge": {
+      "version": "1.0.1",
+      "resolved": "https://registry.npmjs.org/utils-merge/-/utils-merge-1.0.1.tgz",
+      "integrity": "sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.4.0"
+      }
+    },
+    "node_modules/v8-compile-cache-lib": {
+      "version": "3.0.1",
+      "resolved": "https://registry.npmjs.org/v8-compile-cache-lib/-/v8-compile-cache-lib-3.0.1.tgz",
+      "integrity": "sha512-wa7YjyUGfNZngI/vtK0UHAN+lgDCxBPCylVXGp0zu59Fz5aiGtNXaq3DhIov063MorB+VfufLh3JlF2KdTK3xg==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/vary": {
+      "version": "1.1.2",
+      "resolved": "https://registry.npmjs.org/vary/-/vary-1.1.2.tgz",
+      "integrity": "sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 0.8"
+      }
+    },
+    "node_modules/webidl-conversions": {
+      "version": "3.0.1",
+      "resolved": "https://registry.npmjs.org/webidl-conversions/-/webidl-conversions-3.0.1.tgz",
+      "integrity": "sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==",
+      "license": "BSD-2-Clause"
+    },
+    "node_modules/whatwg-url": {
+      "version": "5.0.0",
+      "resolved": "https://registry.npmjs.org/whatwg-url/-/whatwg-url-5.0.0.tgz",
+      "integrity": "sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw==",
+      "license": "MIT",
+      "dependencies": {
+        "tr46": "~0.0.3",
+        "webidl-conversions": "^3.0.0"
+      }
+    },
+    "node_modules/wide-align": {
+      "version": "1.1.5",
+      "resolved": "https://registry.npmjs.org/wide-align/-/wide-align-1.1.5.tgz",
+      "integrity": "sha512-eDMORYaPNZ4sQIuuYPDHdQvf4gyCF9rEEV/yPxGfwPkRodwEgiMUUXTx/dex+Me0wxx53S+NgUHaP7y3MGlDmg==",
+      "license": "ISC",
+      "dependencies": {
+        "string-width": "^1.0.2 || 2 || 3 || 4"
+      }
+    },
+    "node_modules/wrappy": {
+      "version": "1.0.2",
+      "resolved": "https://registry.npmjs.org/wrappy/-/wrappy-1.0.2.tgz",
+      "integrity": "sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==",
+      "license": "ISC"
+    },
+    "node_modules/xtend": {
+      "version": "4.0.2",
+      "resolved": "https://registry.npmjs.org/xtend/-/xtend-4.0.2.tgz",
+      "integrity": "sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=0.4"
+      }
+    },
+    "node_modules/yallist": {
+      "version": "4.0.0",
+      "resolved": "https://registry.npmjs.org/yallist/-/yallist-4.0.0.tgz",
+      "integrity": "sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==",
+      "license": "ISC"
+    },
+    "node_modules/yn": {
+      "version": "3.1.1",
+      "resolved": "https://registry.npmjs.org/yn/-/yn-3.1.1.tgz",
+      "integrity": "sha512-Ux4ygGWsu2c7isFWe8Yu1YluJmqVhxqK2cLXNQA5AcC3QfbGNpM7fu0Y8b/z16pXLnFxZYvWhd3fhBY9DLmC6Q==",
+      "dev": true,
+      "license": "MIT",
+      "engines": {
+        "node": ">=6"
+      }
+    }
+  }
+}
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\package.json
+# ==============================================================
+
+{
+    "name":  "server",
+    "version":  "1.0.0",
+    "type":  "module",
+    "scripts":  {
+                    "start":  "node dist/server.js",
+                    "dev":  "tsx server.ts",
+                    "build":  "tsc",
+                    "watch":  "tsx watch server.ts"
+                },
+    "dependencies":  {
+                         "bcrypt":  "^5.1.1",
+                         "cloudinary":  "^2.5.1",
+                         "cookie-parser":  "^1.4.7",
+                         "cors":  "^2.8.5",
+                         "dotenv":  "^16.4.7",
+                         "express":  "^4.21.2",
+                         "express-fileupload":  "^1.5.1",
+                         "jsonwebtoken":  "^9.0.2",
+                         "nodemailer":  "^6.10.0",
+                         "pg":  "^8.13.3",
+                         "stripe":  "^17.7.0"
+                     },
+    "devDependencies":  {
+                            "@types/bcryptjs":  "^2.4.6",
+                            "@types/cookie-parser":  "^1.4.8",
+                            "@types/cors":  "^2.8.17",
+                            "@types/express":  "^5.0.0",
+                            "@types/express-fileupload":  "^1.5.1",
+                            "@types/jsonwebtoken":  "^9.0.9",
+                            "@types/multer":  "^1.4.12",
+                            "@types/node":  "^22.13.4",
+                            "@types/nodemailer":  "^6.4.17",
+                            "ts-node":  "^10.9.2",
+                            "tsx":  "^4.19.2",
+                            "typescript":  "^5.7.3"
+                        }
+}
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\tsconfig.json
+# ==============================================================
+
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./",
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": ["./**/*.ts"],
+  "exclude": ["node_modules", "dist", "uploads"]
+}
+
+
+# ==============================================================
+# FILE: FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE\vercel.json
+# ==============================================================
+
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/server.ts"
+    }
+  ]
+}

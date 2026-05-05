@@ -9,9 +9,7 @@ import {
 } from "../../store/slices/authSlice";
 import { toggleAuthPopup } from "../../store/slices/popupSlice";
 
-// BUG FIX: Import toggleSidebar or remove the onClick handler
-// import { toggleSidebar } from "../../store/slices/popupSlice"; // Add this if needed
-
+// 
 const ProfilePanel = () => {
   const dispatch = useAppDispatch();
 
@@ -24,7 +22,7 @@ const ProfilePanel = () => {
   const [email, setEmail] = useState(authUser?.email || "");
   const [avatar, setAvatar] = useState<File | null>(null);
 
-  // BUG FIX: Add missing password states
+  
   const [showPassword, setShowPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -50,13 +48,13 @@ const ProfilePanel = () => {
   };
 
   const handleUpdatePassword = () => {
-    // BUG FIX: Validate passwords match
+    
     if (newPassword !== confirmNewPassword) {
       toast.error("New passwords do not match");
       return;
     }
 
-    // BUG FIX: Pass the data object to the thunk
+  
     const data = {
       currentPassword,
       newPassword,
@@ -64,7 +62,7 @@ const ProfilePanel = () => {
     };
     dispatch(updatePassword(data));
     
-    // BUG FIX: Clear password fields after submission
+    
     setCurrentPassword("");
     setNewPassword("");
     setConfirmNewPassword("");

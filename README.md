@@ -1,6 +1,6 @@
 # ShopMate — Full-Stack AI-Based E-Commerce Web Application
 
-A complete, production-ready e-commerce platform built with React, Node.js, PostgreSQL, and AI-powered product search. Includes a customer-facing storefront, an admin dashboard, and a REST API backend.
+A complete, production-ready e-commerce platform built with React, Node.js, PostgreSQL, and AI-powered product search. Includes a customer-facing storefront, an admin dashboard, and a REST API backend. The entire codebase is written in **strict TypeScript**.
 
 ---
 
@@ -8,9 +8,9 @@ A complete, production-ready e-commerce platform built with React, Node.js, Post
 
 ```
 myWebsite/
-├── ecommerce-frontend-template/        # Customer storefront (React + Vite)
-├── ecommerce-dashboard-template/       # Admin dashboard (React + Vite)
-└── FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE/   # Node.js API
+├── ecommerce-frontend-template/        # Customer storefront (React + Vite + TypeScript)
+├── ecommerce-dashboard-template/       # Admin dashboard (React + Vite + TypeScript)
+└── FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE/   # Node.js API (TypeScript)
 ```
 
 ---
@@ -51,8 +51,8 @@ myWebsite/
 
 | Layer | Technology |
 |---|---|
-| Frontend & Dashboard | React 18, Vite, Redux Toolkit, Tailwind CSS |
-| Backend | Node.js, Express.js |
+| Frontend & Dashboard | React 18, Vite, Redux Toolkit, Tailwind CSS, **TypeScript** |
+| Backend | Node.js, Express.js, **TypeScript** |
 | Database | PostgreSQL (via `pg` pool), hosted on Neon |
 | Authentication | JWT, bcrypt, HTTP-only cookies |
 | Payments | Stripe (Payment Intents + Webhooks) |
@@ -67,6 +67,7 @@ myWebsite/
 
 ### Prerequisites
 - Node.js v18+
+- TypeScript (installed automatically via `npm install`)
 - A PostgreSQL database (e.g., [Neon](https://neon.tech))
 - Accounts for: Cloudinary, Stripe, Google AI Studio (Gemini), an SMTP email provider
 
@@ -106,10 +107,12 @@ SMTP_PASSWORD=your_app_password
 ADMIN_SECRET_KEY=your_admin_registration_key
 ```
 
-Start the server:
+Available scripts:
 
 ```bash
-node server.js
+npm run dev      # Start development server with tsx
+npm run build    # Compile TypeScript to dist/
+npm start        # Run compiled production build
 ```
 
 Database tables are created automatically on first run.
@@ -267,6 +270,7 @@ https://your-backend.vercel.app/api/v1/payment/webhook
 
 ## Key Implementation Notes
 
+- **TypeScript**: All three projects use strict TypeScript with full type coverage across components, Redux slices, API handlers, and database queries.
 - **Currency**: Prices are stored internally in USD. The backend divides incoming prices by 283 on creation/update to convert from PKR to USD.
 - **Reviews**: Users can only review products from orders with status `Delivered`.
 - **Stock**: Automatically decremented when a Stripe `payment_intent.succeeded` webhook is received.
@@ -283,6 +287,13 @@ This project is for personal and portfolio use. All rights reserved by the autho
 
 ## Author
 
-**Daniel George**  
-Lagos, Nigeria  
+**Daniel George**
+Lagos, Nigeria
 georgeabiamakadaniel@gmail.com
+
+
+
+
+
+
+

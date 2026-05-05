@@ -2,15 +2,13 @@
 import { categories } from "../data/products";
 import ProductCard from "../components/Products/ProductCard";
 import Pagination from "../components/Products/Pagination";
-import AISearchModal from "../components/Products/AISearchModal";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { fetchAllProducts } from "../store/slices/productSlice";
-import { toggleAIModal } from "../store/slices/popupSlice"; 
 
 const Products = () => {
-  const { products, totalProducts } = useAppSelector((state) => state.product);
+  const { products, totalProducts, loading } = useAppSelector((state) => state.product);
 
   const useQuery = () => {
     return new URLSearchParams(useLocation().search);
@@ -20,10 +18,9 @@ const Products = () => {
   const searchTerm = query.get("search");
   const searchedCategory = query.get("category");
 
-  const [searchQuery, setSearchQuery] = useState(searchTerm || "");
-  const [selectedCategory, setSelectedCategory] = useState(
-    searchedCategory || ""
-  );
+  const [searchQuery, setSearchQuery] = useState(searchTerm ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm ?? "");
+  const [selectedCategory, setSelectedCategory] = useState(searchedCategory ?? "");
   const [priceRange, setPriceRange] = useState([0, 10000]);
   const [selectedRating, setSelectedRating] = useState(0);
   const [availability, setAvailability] = useState("");
@@ -33,27 +30,55 @@ const Products = () => {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
+    setSelectedCategory(searchedCategory ?? "");
+    setCurrentPage(1);
+  }, [searchedCategory]);
+
+  useEffect(() => {
+    setSearchQuery(searchTerm ?? "");
+    setDebouncedSearch(searchTerm ?? "");
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
     dispatch(
       fetchAllProducts({
         category: selectedCategory,
         price: `${priceRange[0]}-${priceRange[1]}`,
-        search: searchQuery,
+        search: debouncedSearch,
         ratings: selectedRating,
         availability: availability,
         page: currentPage,
       })
     );
-  }, [
-    dispatch,
-    selectedCategory,
-    priceRange,
-    searchQuery,
-    selectedRating,
-    availability,
-    currentPage,
-  ]);
+  }, [dispatch, selectedCategory, priceRange, debouncedSearch, selectedRating, availability, currentPage]);
 
   const totalPages = Math.ceil(totalProducts / 10);
+
+  const handleResetFilters = useCallback(() => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setSelectedCategory("");
+    setPriceRange([0, 10000]);
+    setSelectedRating(0);
+    setAvailability("");
+    setCurrentPage(1);
+  }, []);
+
+  const hasActiveFilters =
+    searchQuery !== "" ||
+    selectedCategory !== "" ||
+    priceRange[1] !== 10000 ||
+    selectedRating !== 0 ||
+    availability !== "";
 
   return (
     <>
@@ -70,30 +95,25 @@ const Products = () => {
             </button>
 
             {/* SIDEBAR FILTERS */}
-            <div
-              className={`lg:block ${
-                isMobileFilterOpen ? "block" : "hidden"
-              } w-full lg:w-80 space-y-6`}
-            >
+            <div className={`lg:block ${isMobileFilterOpen ? "block" : "hidden"} w-full lg:w-80 space-y-6`}>
               <div className="glass-panel">
-                <h2 className="text-xl font-semibold text-foreground mb-6">
-                  Filters
-                </h2>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold text-foreground">Filters</h2>
+                  {hasActiveFilters && (
+                    <button onClick={handleResetFilters} className="text-sm text-primary hover:underline">
+                      Reset All
+                    </button>
+                  )}
+                </div>
 
                 {/* PRICE RANGE */}
                 <div className="mb-6">
-                  <h3 className="text-lg font-medium text-foreground mb-3">
-                    Price Range
-                  </h3>
+                  <h3 className="text-lg font-medium text-foreground mb-3">Price Range</h3>
                   <div className="space-y-2">
                     <input
-                      type="range"
-                      min="0"
-                      max="10000"
+                      type="range" min="0" max="10000"
                       value={priceRange[1]}
-                      onChange={(e) =>
-                        setPriceRange([priceRange[0], parseInt(e.target.value)])
-                      }
+                      onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
                       className="w-full"
                     />
                     <div className="flex justify-between text-sm text-muted-foreground">
@@ -105,107 +125,58 @@ const Products = () => {
 
                 {/* RATING */}
                 <div className="mb-6">
-                  <h3 className="text-lg font-medium text-foreground mb-3">
-                    Rating
-                  </h3>
+                  <h3 className="text-lg font-medium text-foreground mb-3">Rating</h3>
                   <div className="space-y-2">
-                    {[4, 3, 2, 1].map((rating) => {
-                      return (
-                        <button
-                          key={rating}
-                          onClick={() =>
-                            setSelectedRating(
-                              selectedRating === rating ? 0 : rating
-                            )
-                          }
-                          className={`flex items-center space-x-2 w-full p-2 rounded ${
-                            selectedRating === rating
-                              ? "bg-primary/20"
-                              : "hover:bg-secondary"
-                          }`}
-                        >
-                          {[...Array(5)].map((_, i) => {
-                            return (
-                              <Star
-                                key={i}
-                                className={`w-4 h-4 ${
-                                  i < rating
-                                    ? "text-yellow-400 fill-current"
-                                    : "text-gray-300"
-                                }`}
-                              />
-                            );
-                          })}
-                          <span className="text-sm">& Up</span>
-                        </button>
-                      );
-                    })}
+                    {[4, 3, 2, 1].map((rating) => (
+                      <button
+                        key={rating}
+                        onClick={() => setSelectedRating(selectedRating === rating ? 0 : rating)}
+                        className={`flex items-center space-x-2 w-full p-2 rounded ${selectedRating === rating ? "bg-primary/20" : "hover:bg-secondary"}`}
+                      >
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className={`w-4 h-4 ${i < rating ? "text-yellow-400 fill-current" : "text-gray-300"}`} />
+                        ))}
+                        <span className="text-sm">& Up</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 {/* AVAILABILITY */}
                 <div className="mb-6">
-                  <h3 className="text-lg font-medium text-foreground mb-3">
-                    Availability
-                  </h3>
+                  <h3 className="text-lg font-medium text-foreground mb-3">Availability</h3>
                   <div className="space-y-2">
-                    {["in-stock", "limited", "out-of-stock"].map((status) => {
-                      return (
-                        <button
-                          key={status}
-                          onClick={() =>
-                            setAvailability(
-                              availability === status ? "" : status
-                            )
-                          }
-                          className={`w-full p-2 text-left rounded ${
-                            availability === status
-                              ? "bg-primary/20"
-                              : "hover:bg-secondary"
-                          }`}
-                        >
-                          {status === "in-stock"
-                            ? "In Stock"
-                            : status === "limited"
-                            ? "Limited Stock"
-                            : "Out of Stock"}
-                        </button>
-                      );
-                    })}
+                    {["in-stock", "limited", "out-of-stock"].map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => setAvailability(availability === status ? "" : status)}
+                        className={`w-full p-2 text-left rounded ${availability === status ? "bg-primary/20" : "hover:bg-secondary"}`}
+                      >
+                        {status === "in-stock" ? "In Stock" : status === "limited" ? "Limited Stock" : "Out of Stock"}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 {/* CATEGORY */}
                 <div className="mb-6">
-                  <h3 className="text-lg font-medium text-foreground mb-3">
-                    Category
-                  </h3>
+                  <h3 className="text-lg font-medium text-foreground mb-3">Category</h3>
                   <div className="space-y-2">
                     <button
                       onClick={() => setSelectedCategory("")}
-                      className={`w-full p-2 text-left rounded ${
-                        !selectedCategory
-                          ? "bg-primary/20"
-                          : "hover:bg-secondary"
-                      }`}
+                      className={`w-full p-2 text-left rounded ${!selectedCategory ? "bg-primary/20" : "hover:bg-secondary"}`}
                     >
                       All Categories
                     </button>
-                    {categories.map((category) => {
-                      return (
-                        <button
-                          key={category.id}
-                          onClick={() => setSelectedCategory(category.name)}
-                          className={`w-full p-2 text-left rounded ${
-                            selectedCategory === category.name
-                              ? "bg-primary/20"
-                              : "hover:bg-secondary"
-                          }`}
-                        >
-                          {category.name}
-                        </button>
-                      );
-                    })}
+                    {categories.map((category) => (
+                      <button
+                        key={category.id}
+                        onClick={() => setSelectedCategory(category.name)}
+                        className={`w-full p-2 text-left rounded ${selectedCategory === category.name ? "bg-primary/20" : "hover:bg-secondary"}`}
+                      >
+                        {category.name}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -225,43 +196,43 @@ const Products = () => {
                     className="w-full pl-10 pr-4 py-3 bg-secondary border border-border rounded-lg focus:outline-none text-foreground placeholder-muted-foreground"
                   />
                 </div>
-                <button
-                  className="relative inline-flex items-center justify-center p-0.5 overflow-hidden text-sm font-medium text-gray-900 rounded-lg group bg-gradient-to-br from-purple-500 to-pink-500 group-hover:from-purple-500 group-hover:to-pink-500 hover:text-white dark:text-white focus:ring-4 focus:outline-none focus:ring-purple-200 dark:focus:ring-purple-800 max-[440px]:min-w-full min-w-[132px]"
-                  onClick={() => dispatch(toggleAIModal())} // âœ… FIXED: now works with import above
-                >
-                  <span className="relative w-full px-5 py-3 transition-all ease-in duration-75 bg-white dark:bg-gray-900 rounded-md group-hover:bg-transparent group-hover:dark:bg-transparent flex justify-center items-center gap-2">
-                    <Sparkles className="w-5 h-5" />
-                    <span>AI Search</span>
-                  </span>
-                </button>
               </div>
 
-              {/* AI SEARCH MODAL */}
-              <AISearchModal />
-
-              {/* PRODUCTS GRID */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                {products.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-
-              {/* PAGINATION */}
-              {totalPages > 1 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                />
-              )}
-
-              {/* No Results */}
-              {products.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground text-lg">
-                    No products found matching your criteria.
-                  </p>
+              {/* LOADING / PRODUCTS */}
+              {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="glass-card animate-pulse">
+                      <div className="w-full h-48 bg-secondary rounded-lg mb-4" />
+                      <div className="h-5 bg-secondary rounded w-3/4 mb-2" />
+                      <div className="h-4 bg-secondary rounded w-1/2 mb-2" />
+                      <div className="h-6 bg-secondary rounded w-1/3" />
+                    </div>
+                  ))}
                 </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                    {products.map((product) => (
+                      <ProductCard key={product.id} product={product} />
+                    ))}
+                  </div>
+
+                  {totalPages > 1 && (
+                    <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                  )}
+
+                  {products.length === 0 && (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground text-lg mb-4">No products found matching your criteria.</p>
+                      {hasActiveFilters && (
+                        <button onClick={handleResetFilters} className="text-primary hover:underline text-sm">
+                          Clear all filters
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -272,3 +243,4 @@ const Products = () => {
 };
 
 export default Products;
+

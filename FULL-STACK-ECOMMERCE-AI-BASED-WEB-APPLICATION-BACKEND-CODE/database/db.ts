@@ -7,11 +7,19 @@ dotenv.config({ path: "./config/config.env" });
 
 const { Pool } = pkg;
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+const isNeon = process.env.DB_ENV === "neon";
+
+if (isNeon) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
 
 export const database = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  connectionString: isNeon
+    ? process.env.DATABASE_URL
+    : process.env.LOCAL_DATABASE_URL,
+  ...(isNeon && {
+    ssl: { rejectUnauthorized: false },
+  }),
   max: 1,
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 10000,
@@ -21,9 +29,11 @@ export const database = new Pool({
 export const connectDB = async (): Promise<void> => {
   try {
     await database.query("SELECT 1");
-    console.log("Connected to PostgreSQL successfully");
+    console.log(
+      `✅ Connected to ${isNeon ? "Neon (Cloud)" : "Local pgAdmin"} PostgreSQL successfully`
+    );
   } catch (error) {
-    console.error("Database connection failed:", (error as Error).message);
+    console.error("❌ Database connection failed:", (error as Error).message);
     process.exit(1);
   }
 };

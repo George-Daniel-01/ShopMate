@@ -4,10 +4,30 @@ import { Link } from "react-router-dom";
 import { useAppDispatch } from "../../store/hooks";
 import { addToCart } from "../../store/slices/cartSlice";
 
+const FALLBACK_IMAGE = "/avatar-holder.avif";
+
+const isValidImageUrl = (url: string | undefined | null): boolean => {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    // relative paths like /uploads/image.jpg are also valid
+    return url.startsWith("/") && url.length > 1;
+  }
+};
+
 const ProductCard = ({ product }: { product: import("../../types/index").Product }) => {
   const dispatch = useAppDispatch();
 
-  const handleAddToCart = (product: import("../../types/index").Product, e: React.MouseEvent) => {
+  const imageUrl = isValidImageUrl(product.images?.[0]?.url)
+    ? product.images[0].url
+    : FALLBACK_IMAGE;
+
+  const handleAddToCart = (
+    product: import("../../types/index").Product,
+    e: React.MouseEvent
+  ) => {
     e.preventDefault();
     e.stopPropagation();
     if (product.stock > 0) {
@@ -15,40 +35,42 @@ const ProductCard = ({ product }: { product: import("../../types/index").Product
     }
   };
 
-  // âœ… ADDED: Helper function to check if product is new (within 30 days)
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.currentTarget;
+    if (target.src !== window.location.origin + FALLBACK_IMAGE) {
+      target.src = FALLBACK_IMAGE;
+    }
+  };
+
   const isNewProduct = (product: import("../../types/index").Product) => {
-    // Handle both camelCase and snake_case from backend
-    const createdAt = product.created_at || product.created_at;
+    const createdAt = product.created_at;
     if (!createdAt) return false;
-    
     const createdDate = new Date(createdAt);
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - createdDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
     return diffDays <= 30;
   };
 
-  // âœ… ADDED: Helper function to check if product is top rated
   const isTopRated = (product: import("../../types/index").Product) => {
     return product.ratings >= 4.5;
   };
 
   return (
-    <Link 
-      key={product.id} 
-      to={`/product/${product.id}`} 
+    <Link
+      key={product.id}
+      to={`/product/${product.id}`}
       className="flex-shrink-0 w-80 glass-card hover:glow-on-hover animate-smooth group"
     >
       <div className="relative overflow-hidden rounded-lg mb-4">
-        <img 
-          src={product.images?.[0]?.url} 
-          alt={product.name} 
+        <img
+          src={imageUrl}
+          alt={product.name}
+          onError={handleImageError}
           className="w-full h-48 object-contain group-hover:scale-110 transition-transform duration-300"
         />
-        
+
         <div className="absolute top-3 left-3 flex flex-col space-y-2">
-          {/* âœ… FIXED: Use helper function with proper field name handling */}
           {isNewProduct(product) && (
             <span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded">
               NEW
@@ -100,13 +122,15 @@ const ProductCard = ({ product }: { product: import("../../types/index").Product
         </div>
 
         <div>
-          <span className={`text-xs px-2 py-1 rounded ${
-            product.stock > 5
-              ? "bg-green-500/20 text-green-400"
-              : product.stock > 0
-              ? "bg-yellow-500/20 text-yellow-400"
-              : "bg-red-500/20 text-red-400"
-          }`}>
+          <span
+            className={`text-xs px-2 py-1 rounded ${
+              product.stock > 5
+                ? "bg-green-500/20 text-green-400"
+                : product.stock > 0
+                ? "bg-yellow-500/20 text-yellow-400"
+                : "bg-red-500/20 text-red-400"
+            }`}
+          >
             {product.stock > 5
               ? "In Stock"
               : product.stock > 0
