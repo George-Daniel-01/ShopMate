@@ -25,7 +25,12 @@ cloudinary.config({
 const app = express();
 
 app.use(cors({
-  origin: (_origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => callback(null, true),
+  origin: [
+    "https://shop-mate-six-azure.vercel.app",
+    "https://shop-dashboard-tan.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:5174",
+  ],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true,
 }));
@@ -106,3 +111,4 @@ app.use("/api/v1/order", orderRouter);
 app.use(errorMiddleware);
 
 export default app;
+
