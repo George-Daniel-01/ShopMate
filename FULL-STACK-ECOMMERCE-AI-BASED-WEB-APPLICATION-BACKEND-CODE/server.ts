@@ -1,4 +1,4 @@
-﻿import dotenv from "dotenv";
+import dotenv from "dotenv";
 dotenv.config({ path: "./config/config.env" });
 
 import { connectDB } from "./database/db.js";
@@ -12,15 +12,19 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_CLIENT_SECRET,
 });
 
-const start = async (): Promise<void> => {
-  await connectDB();
-  await createTables();
-
-  app.listen(process.env.PORT || 4000, () => {
-    console.log("Server running on port " + (process.env.PORT || 4000));
-  });
-};
-
-start();
+// Only listen when running locally, NOT on Vercel
+if (process.env.VERCEL !== "1") {
+  const start = async (): Promise<void> => {
+    await connectDB();
+    await createTables();
+    app.listen(process.env.PORT || 4000, () => {
+      console.log("Server running on port " + (process.env.PORT || 4000));
+    });
+  };
+  start();
+} else {
+  // On Vercel: init DB and tables without listening
+  connectDB().then(() => createTables());
+}
 
 export default app;

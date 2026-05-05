@@ -29,11 +29,9 @@ export const database = new Pool({
 export const connectDB = async (): Promise<void> => {
   try {
     await database.query("SELECT 1");
-    console.log(
-      `✅ Connected to ${isNeon ? "Neon (Cloud)" : "Local pgAdmin"} PostgreSQL successfully`
-    );
+    console.log(`Connected to ${isNeon ? "Neon (Cloud)" : "Local"} PostgreSQL successfully`);
   } catch (error) {
-    console.error("❌ Database connection failed:", (error as Error).message);
-    process.exit(1);
+    console.error("DB connection failed:", error);
+    throw error;
   }
 };
