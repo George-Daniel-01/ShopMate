@@ -24,13 +24,25 @@ cloudinary.config({
 
 const app = express();
 
+const allowedOrigins = [
+  "https://shop-mate-six-azure.vercel.app",
+  "https://shop-dashboard-tan.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:5174",
+];
+
 app.use(cors({
-  origin: [
-    "https://shop-mate-six-azure.vercel.app",
-    "https://shop-dashboard-tan.vercel.app",
-    "http://localhost:5173",
-    "http://localhost:5174",
-  ],
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (
+      allowedOrigins.includes(origin) ||
+      /\.vercel\.app$/.test(origin)
+    ) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked: ${origin}`));
+    }
+  },
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true,
 }));
@@ -111,4 +123,5 @@ app.use("/api/v1/order", orderRouter);
 app.use(errorMiddleware);
 
 export default app;
+
 
