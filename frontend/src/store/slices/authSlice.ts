@@ -1,4 +1,4 @@
-﻿import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { axiosInstance } from "../../lib/axios";
 import { toast } from "react-toastify";
 import { toggleAuthPopup } from "./popupSlice";
@@ -64,7 +64,7 @@ export const forgotPassword = createAsyncThunk<null, { email: string }>(
   async (data, thunkAPI) => {
     try {
       const res = await axiosInstance.post("/auth/password/forgot", data, {
-        params: { frontendUrl: "http://localhost:5173" },
+        params: { frontendUrl: "https://shop-mate-six-azure.vercel.app" },
       });
       toast.success(res.data.message);
       return null;
