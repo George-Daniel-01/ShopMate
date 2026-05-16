@@ -81,7 +81,7 @@ export const logout = () => async (dispatch: AppDispatch) => {
 export const forgotPassword = (email: { email: string }) => async (dispatch: AppDispatch) => {
   dispatch(authSlice.actions.forgotPasswordRequest());
   try {
-    const res = await axiosInstance.post("/auth/password/forgot?frontendUrl=http://localhost:5174", email);
+    const res = await axiosInstance.post("/auth/password/forgot?frontendUrl=https://shop-dashboard-tan.vercel.app", email);
     dispatch(authSlice.actions.forgotPasswordSuccess());
     toast.success(res.data.message);
   } catch (error: any) {
