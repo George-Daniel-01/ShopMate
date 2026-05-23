@@ -1,4 +1,4 @@
-﻿import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { toggleCreateProductModal, toggleUpdateProductModal } from "./extraSlice";
@@ -6,13 +6,13 @@ import type { Product, ProductState } from "../../types/index";
 import type { AppDispatch } from "../store";
 
 const axiosInstance = axios.create({
-  baseURL: "http://localhost:4000/api/v1",
+  baseURL: `${import.meta.env.VITE_API_URL || "http://localhost:4000"}/api/v1`,
   withCredentials: true,
 });
 
-// ✅ FIX: Added `actionLoading` separate from `loading`
-// `loading`       → only for the initial products table fetch (shows spinner over table)
-// `actionLoading` → for create / update / delete actions (never hides the table)
+// ? FIX: Added `actionLoading` separate from `loading`
+// `loading`       ? only for the initial products table fetch (shows spinner over table)
+// `actionLoading` ? for create / update / delete actions (never hides the table)
 const initialState: ProductState & { actionLoading: boolean } = {
   loading: false,
   actionLoading: false,
@@ -24,9 +24,9 @@ const productSlice = createSlice({
   name: "product",
   initialState,
   reducers: {
-    // ── Create ──────────────────────────────────────────────
+    // -- Create ----------------------------------------------
     createProductRequest(state) {
-      state.actionLoading = true; // ✅ use actionLoading, not loading
+      state.actionLoading = true; // ? use actionLoading, not loading
     },
     createProductSuccess(state, action: PayloadAction<Product>) {
       state.actionLoading = false;
@@ -36,9 +36,9 @@ const productSlice = createSlice({
       state.actionLoading = false;
     },
 
-    // ── Fetch all (table load) ───────────────────────────────
+    // -- Fetch all (table load) -------------------------------
     getAllProductsRequest(state) {
-      state.loading = true; // ✅ only fetch uses loading → shows table spinner
+      state.loading = true; // ? only fetch uses loading ? shows table spinner
     },
     getAllProductsSuccess(
       state,
@@ -52,9 +52,9 @@ const productSlice = createSlice({
       state.loading = false;
     },
 
-    // ── Update ───────────────────────────────────────────────
+    // -- Update -----------------------------------------------
     updateProductRequest(state) {
-      state.actionLoading = true; // ✅ table stays visible
+      state.actionLoading = true; // ? table stays visible
     },
     updateProductSuccess(state, action: PayloadAction<Product>) {
       state.actionLoading = false;
@@ -66,9 +66,9 @@ const productSlice = createSlice({
       state.actionLoading = false;
     },
 
-    // ── Delete ───────────────────────────────────────────────
+    // -- Delete -----------------------------------------------
     deleteProductRequest(state) {
-      state.actionLoading = true; // ✅ table stays visible
+      state.actionLoading = true; // ? table stays visible
     },
     deleteProductSuccess(state, action: PayloadAction<string>) {
       state.actionLoading = false;
@@ -81,7 +81,7 @@ const productSlice = createSlice({
   },
 });
 
-// ── Thunks ───────────────────────────────────────────────────────────────────
+// -- Thunks -------------------------------------------------------------------
 
 export const createNewProduct =
   (data: FormData) => async (dispatch: AppDispatch) => {
