@@ -1,9 +1,9 @@
-﻿import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import axios from "axios";
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import { axiosInstance } from "../../lib/axios";
 import toast from "react-hot-toast";
 import type { Order, OrderState } from "../../types/index";
 
-const axiosInstance = axios.create({ baseURL: "http://localhost:4000/api/v1", withCredentials: true });
+
 
 export const fetchAllOrders = createAsyncThunk<Order[]>("orders/fetchAll", async (_, thunkAPI) => {
   try {

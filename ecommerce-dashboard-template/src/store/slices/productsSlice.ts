@@ -1,14 +1,9 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import axios from "axios";
+import { axiosInstance } from "../../lib/axios";
 import toast from "react-hot-toast";
 import { toggleCreateProductModal, toggleUpdateProductModal } from "./extraSlice";
 import type { Product, ProductState } from "../../types/index";
 import type { AppDispatch } from "../store";
-
-const axiosInstance = axios.create({
-  baseURL: `${import.meta.env.VITE_API_URL || "http://localhost:4000"}/api/v1`,
-  withCredentials: true,
-});
 
 // ? FIX: Added `actionLoading` separate from `loading`
 // `loading`       ? only for the initial products table fetch (shows spinner over table)
@@ -162,3 +157,4 @@ export const deleteProduct =
   };
 
 export default productSlice.reducer;
+
