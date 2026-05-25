@@ -20,9 +20,9 @@ export const database = new Pool({
   ...(isNeon && {
     ssl: { rejectUnauthorized: false },
   }),
-  max: 1,
-  connectionTimeoutMillis: 10000,
-  idleTimeoutMillis: 10000,
+  max: 5,
+  connectionTimeoutMillis: 15000,
+  idleTimeoutMillis: 30000,
   // family: 4,
 });
 
@@ -35,3 +35,4 @@ export const connectDB = async (): Promise<void> => {
     throw error;
   }
 };
+

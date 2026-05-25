@@ -18,7 +18,8 @@ const DEFAULT_IMAGE: IProductImage = {
 };
 
 const uploadToCloudinary = async (image: any) => {
-  const b64 = Buffer.isBuffer(image.data) ? image.data.toString("base64") : image.data;
+  const buffer = Buffer.isBuffer(image.data) ? image.data : Buffer.from(image.data);
+  const b64 = buffer.toString("base64");
   const dataUri = `data:${image.mimetype};base64,${b64}`;
   return await cloudinary.uploader.upload(dataUri, {
     folder: "Ecommerce_Product_Images", width: 1000, crop: "scale",
