@@ -13,7 +13,7 @@ import adminRouter from "./router/adminRoutes.js";
 import orderRouter from "./router/orderRoutes.js";
 import { database } from "./database/db.js";
 
-config({ path: "./config/config.env" });
+config({ path: "./FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE/config/config.env" });
 
 
 cloudinary.config({
