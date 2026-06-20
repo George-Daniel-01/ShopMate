@@ -1,32 +1,39 @@
-﻿import { useState } from "react";
-import { X, Mail, Lock } from "lucide-react";
+import { useState } from "react";
+import { X, Mail, Lock, User } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
+import { toast } from "react-toastify";
 import { toggleAuthPopup, setAuthPopupView } from "../../store/slices/popupSlice";
-import { login } from "../../store/slices/authSlice";
+import { register } from "../../store/slices/authSlice";
 import type { AppDispatch } from "../../store/store";
 import type { RootState } from "../../types/index";
 
-const LoginModal = () => {
+const RegisterModal = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { isLoggingIn, authUser } = useSelector((state: RootState) => state.auth);
+  const { isSigningUp, authUser } = useSelector((state: RootState) => state.auth);
   const { isAuthPopupOpen, authPopupView } = useSelector((state: RootState) => state.popup);
 
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    dispatch(login({ email, password }));
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    dispatch(register({ name, email, password }));
   };
 
-  if (!isAuthPopupOpen || authPopupView !== "login" || authUser) return null;
+  if (!isAuthPopupOpen || authPopupView !== "register" || authUser) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 backdrop-blur-md bg-[hsla(var(--glass-bg))]" />
       <div className="relative z-10 glass-panel w-full max-w-md mx-4 animate-fade-in-up">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-primary">Welcome Back</h2>
+          <h2 className="text-2xl font-bold text-primary">Create Account</h2>
           <button
             onClick={() => dispatch(toggleAuthPopup())}
             className="p-2 rounded-lg glass-card hover:glow-on-hover animate-smooth"
@@ -35,6 +42,17 @@ const LoginModal = () => {
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Full Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-secondary border border-border rounded-lg focus:outline-none"
+              required
+            />
+          </div>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <input
@@ -57,30 +75,41 @@ const LoginModal = () => {
               required
             />
           </div>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <input
+              type="password"
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-secondary border border-border rounded-lg focus:outline-none"
+              required
+            />
+          </div>
           <button
             type="submit"
-            disabled={isLoggingIn}
+            disabled={isSigningUp}
             className={`w-full py-3 gradient-primary flex justify-center items-center gap-2 text-primary-foreground rounded-lg font-semibold animate-smooth ${
-              isLoggingIn ? "opacity-70 cursor-not-allowed" : "hover:glow-on-hover"
+              isSigningUp ? "opacity-70 cursor-not-allowed" : "hover:glow-on-hover"
             }`}
           >
-            {isLoggingIn ? (
+            {isSigningUp ? (
               <>
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Signing in...</span>
+                <span>Signing up...</span>
               </>
             ) : (
-              "Sign In"
+              "Create Account"
             )}
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
+          Already have an account?{" "}
           <button
-            onClick={() => dispatch(setAuthPopupView("register"))}
+            onClick={() => dispatch(setAuthPopupView("login"))}
             className="text-primary hover:underline font-medium"
           >
-            Register
+            Sign In
           </button>
         </p>
       </div>
@@ -88,4 +117,4 @@ const LoginModal = () => {
   );
 };
 
-export default LoginModal;
+export default RegisterModal;

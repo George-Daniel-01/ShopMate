@@ -68,12 +68,14 @@ export const logout = catchAsyncErrors(
 );
 
 export const forgotPassword = catchAsyncErrors(
+
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { email } = req.body as { email: string };
     const { frontendUrl } = req.query as { frontendUrl: string };
     const userResult = await database.query<IUser>(`SELECT * FROM users WHERE email = $1`, [email]);
     if (userResult.rows.length === 0)
       return next(new ErrorHandler("User not found with this email.", 404));
+    
     const user = userResult.rows[0];
     const { hashedToken, resetPasswordExpireTime, resetToken } = generateResetPasswordToken();
     await database.query(
@@ -197,4 +199,11 @@ export const registerAdmin = catchAsyncErrors(
     sendToken(user.rows[0], 201, "Admin registered successfully", res);
   }
 );
+
+
+
+
+
+
+
 

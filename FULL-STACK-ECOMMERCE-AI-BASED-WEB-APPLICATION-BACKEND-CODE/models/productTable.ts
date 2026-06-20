@@ -20,3 +20,4 @@ export async function createProductsTable() {
     process.exit(1);
   }
 }
+

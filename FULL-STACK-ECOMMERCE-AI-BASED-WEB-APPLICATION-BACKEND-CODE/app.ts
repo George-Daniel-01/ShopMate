@@ -13,7 +13,7 @@ import adminRouter from "./router/adminRoutes.js";
 import orderRouter from "./router/orderRoutes.js";
 import { database } from "./database/db.js";
 
-config({ path: "./FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE/config/config.env" });
+config({ path: "./config/config.env" });
 
 
 cloudinary.config({
@@ -120,6 +120,13 @@ app.use("/api/v1/order", orderRouter);
 app.use(errorMiddleware);
 
 export default app;
+
+
+
+
+
+
+
 
 
 

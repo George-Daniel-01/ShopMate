@@ -12,6 +12,7 @@ import SearchOverlay from "./components/Layout/SearchOverlay";
 import CartSidebar from "./components/Layout/CartSidebar";
 import ProfilePanel from "./components/Layout/ProfilePanel";
 import LoginModal from "./components/Layout/LoginModal";
+import RegisterModal from "./components/Layout/RegisterModal";
 import Footer from "./components/Layout/Footer";
 import Index from "./pages/Home";
 import Products from "./pages/Products";
@@ -51,6 +52,7 @@ const App = () => {
           <CartSidebar />
           <ProfilePanel />
           <LoginModal />
+          <RegisterModal />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/password/reset/:token" element={<Index />} />
@@ -73,3 +75,6 @@ const App = () => {
 };
 
 export default App;
+
+
+

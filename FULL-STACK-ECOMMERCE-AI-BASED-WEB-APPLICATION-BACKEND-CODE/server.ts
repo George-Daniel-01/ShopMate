@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-dotenv.config({ path: "./FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE/config/config.env" });
+dotenv.config({ path: "./config/config.env" });
 
 import { connectDB } from "./database/db.js";
 import app from "./app.js";
@@ -28,3 +28,6 @@ if (process.env.VERCEL !== "1") {
 }
 
 export default app;
+
+
+

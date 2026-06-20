@@ -20,3 +20,5 @@ export const createTables = async (): Promise<void> => {
     console.error("Error creating tables:", error);
   }
 };
+
+

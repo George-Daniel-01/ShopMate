@@ -1,5 +1,5 @@
 
-import { database } from "../database/db.js"; // ✅ Named import
+import { database } from "../database/db.js"; 
 
 export async function createOrderItemTable() {
   try {

@@ -3,6 +3,7 @@ import type { PopupState } from "../../types/index";
 
 const initialState: PopupState = {
   isAuthPopupOpen: false,
+  authPopupView: "login",
   isSidebarOpen: false,
   isSearchBarOpen: false,
   isCartOpen: false,
@@ -13,7 +14,11 @@ const popupSlice = createSlice({
   name: "popup",
   initialState,
   reducers: {
-    toggleAuthPopup(state) { state.isAuthPopupOpen = !state.isAuthPopupOpen; },
+    toggleAuthPopup(state) {
+      state.isAuthPopupOpen = !state.isAuthPopupOpen;
+      if (state.isAuthPopupOpen) state.authPopupView = "login";
+    },
+    setAuthPopupView(state, action) { state.authPopupView = action.payload; },
     toggleSidebar(state) { state.isSidebarOpen = !state.isSidebarOpen; },
     toggleSearchBar(state) { state.isSearchBarOpen = !state.isSearchBarOpen; },
     toggleCart(state) { state.isCartOpen = !state.isCartOpen; },
@@ -21,5 +26,5 @@ const popupSlice = createSlice({
   },
 });
 
-export const { toggleAuthPopup, toggleSidebar, toggleSearchBar, toggleCart, toggleAIModal } = popupSlice.actions;
+export const { toggleAuthPopup, setAuthPopupView, toggleSidebar, toggleSearchBar, toggleCart, toggleAIModal } = popupSlice.actions;
 export default popupSlice.reducer;

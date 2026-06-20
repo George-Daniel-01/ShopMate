@@ -22,6 +22,9 @@ export const register = createAsyncThunk<User, FormData | Record<string, string>
   }
 );
 
+
+
+
 export const login = createAsyncThunk<User, Record<string, string>>(
   "auth/login",
   async (data, thunkAPI) => {
