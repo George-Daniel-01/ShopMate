@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { useLocation } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { fetchAllProducts } from "../store/slices/productSlice";
+import { toggleAIModal } from "../store/slices/popupSlice";
 
 const Products = () => {
   const { products, totalProducts, loading } = useAppSelector((state) => state.product);
@@ -186,7 +187,7 @@ const Products = () => {
             <div className="flex-1">
               {/* SEARCH BAR */}
               <div className="mb-8 flex max-[440px]:flex-col items-center gap-2">
-                <div className="relative w-[webkit-fill-available]">
+                <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <input
                     type="text"
@@ -196,6 +197,13 @@ const Products = () => {
                     className="w-full pl-10 pr-4 py-3 bg-secondary border border-border rounded-lg focus:outline-none text-foreground placeholder-muted-foreground"
                   />
                 </div>
+                <button
+                  onClick={() => dispatch(toggleAIModal())}
+                  className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-primary to-purple-600 text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium whitespace-nowrap"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span className="hidden sm:inline">AI Search</span>
+                </button>
               </div>
 
               {/* LOADING / PRODUCTS */}

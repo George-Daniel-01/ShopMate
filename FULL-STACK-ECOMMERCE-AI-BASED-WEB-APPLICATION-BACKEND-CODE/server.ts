@@ -10,6 +10,7 @@ const requiredEnvVars = [
   "CLOUDINARY_CLIENT_NAME", "CLOUDINARY_CLIENT_API", "CLOUDINARY_CLIENT_SECRET",
   "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET",
   "SMTP_HOST", "SMTP_MAIL", "SMTP_PASSWORD",
+  "OPENROUTER_API_KEY",
 ];
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {

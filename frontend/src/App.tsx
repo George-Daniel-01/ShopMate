@@ -9,6 +9,7 @@ import { fetchAllProducts } from "./store/slices/productSlice";
 import Navbar from "./components/Layout/Navbar";
 import Sidebar from "./components/Layout/Sidebar";
 import SearchOverlay from "./components/Layout/SearchOverlay";
+import AISearchOverlay from "./components/Layout/AISearchOverlay";
 import CartSidebar from "./components/Layout/CartSidebar";
 import ProfilePanel from "./components/Layout/ProfilePanel";
 import LoginModal from "./components/Layout/LoginModal";
@@ -51,6 +52,7 @@ const App = () => {
           <Navbar />
           <Sidebar />
           <SearchOverlay />
+          <AISearchOverlay />
           <CartSidebar />
           <ProfilePanel />
           <LoginModal />

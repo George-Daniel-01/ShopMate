@@ -94,7 +94,7 @@ export interface CartState {
 
 export interface PopupState {
   isAuthPopupOpen: boolean;
-  authPopupView: "login" | "register";
+  authPopupView: "login" | "register" | "forgotPassword" | "resetPassword";
   isSidebarOpen: boolean;
   isSearchBarOpen: boolean;
   isCartOpen: boolean;

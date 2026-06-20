@@ -222,6 +222,97 @@ export const postProductReview = catchAsyncErrors(
   }
 );
 
+export const aiSearchProducts = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { userPrompt } = req.body as { userPrompt: string };
+    if (!userPrompt) return next(new ErrorHandler("Please provide a search prompt.", 400));
+
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) return next(new ErrorHandler("AI search is not configured.", 503));
+
+    const systemPrompt = `You are a product search assistant. Extract structured search parameters from the user's natural language query.
+Return ONLY a valid JSON object with these optional fields:
+- "search": string (product name or description keywords, or null)
+- "category": string (product category, or null)
+- "minPrice": number (minimum price, or null)
+- "maxPrice": number (maximum price, or null)
+
+Examples:
+Input: "show me affordable running shoes under $100"
+Output: {"search": "running shoes", "category": null, "minPrice": null, "maxPrice": 100}
+
+Input: "expensive electronics"
+Output: {"search": null, "category": "electronics", "minPrice": 200, "maxPrice": null}`;
+
+    let params: { search: string | null; category: string | null; minPrice: number | null; maxPrice: number | null };
+    try {
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-4o-mini",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          response_format: { type: "json_object" },
+        }),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        return next(new ErrorHandler(`OpenRouter API error: ${errorText}`, 502));
+      }
+      const data = await response.json();
+      params = JSON.parse(data.choices[0].message.content);
+    } catch (error: any) {
+      return next(new ErrorHandler(`AI search failed: ${error.message}`, 502));
+    }
+
+    const conditions: string[] = [];
+    const values: (string | number)[] = [];
+    let index = 1;
+
+    if (params.search) {
+      conditions.push(`(p.name ILIKE $${index} OR p.description ILIKE $${index + 1})`);
+      values.push(`%${params.search}%`, `%${params.search}%`);
+      index += 2;
+    }
+    if (params.category) {
+      conditions.push(`p.category ILIKE $${index}`);
+      values.push(`%${params.category}%`);
+      index++;
+    }
+    if (params.minPrice !== null) {
+      conditions.push(`p.price >= $${index}`);
+      values.push(params.minPrice);
+      index++;
+    }
+    if (params.maxPrice !== null) {
+      conditions.push(`p.price <= $${index}`);
+      values.push(params.maxPrice);
+      index++;
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const countResult = await database.query<{ count: string }>(`SELECT COUNT(*) FROM products p ${whereClause}`, values);
+    const totalProducts = parseInt(countResult.rows[0].count);
+
+    const result = await database.query(
+      `SELECT p.*, COUNT(r.id) AS review_count FROM products p LEFT JOIN reviews r ON p.id = r.product_id ${whereClause} GROUP BY p.id ORDER BY p.created_at DESC LIMIT 50`,
+      values
+    );
+
+    res.status(200).json({
+      success: true,
+      products: result.rows.map(parseProductImages),
+      totalProducts,
+    });
+  }
+);
+
 export const deleteReview = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { productId } = req.params;
