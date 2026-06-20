@@ -87,6 +87,11 @@ export interface AuthState {
   isAuthenticated: boolean;
 }
 
+export interface LowStockProduct {
+  name: string;
+  stock: number;
+}
+
 export interface AdminState {
   loading: boolean;
   users: User[];
@@ -98,7 +103,8 @@ export interface AdminState {
   monthlySales: MonthlySale[];
   orderStatusCounts: OrderStatusCounts;
   topSellingProducts: TopSellingProduct[];
-  lowStockProducts: number;
+  lowStockProducts: LowStockProduct[];
+  lowStockCount: number;
   revenueGrowth: string;
   newUsersThisMonth: number;
   currentMonthSales: number;
@@ -114,6 +120,7 @@ export interface ExtraState {
 
 export interface ProductState {
   loading: boolean;
+  actionLoading: boolean;
   products: Product[];
   totalProducts: number;
 }

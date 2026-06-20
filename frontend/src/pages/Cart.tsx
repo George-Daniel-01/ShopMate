@@ -8,11 +8,14 @@ const Cart = () => {
   const { cart } = useAppSelector((state) => state.cart);
   const { authUser } = useAppSelector((state) => state.auth);
   
-  const updateQuantity = (id: string, quantity: number) => {
-    if (quantity <= 0) {
+  const updateQuantity = (id: string, delta: number) => {
+    const item = cart.find((item) => item.product.id === id);
+    if (!item) return;
+    const newQuantity = item.quantity + delta;
+    if (newQuantity <= 0) {
       dispatch(removeFromCart(id));
     } else {
-      dispatch(updateCartQuantity({ id, quantity }));
+      dispatch(updateCartQuantity({ id, quantity: delta }));
     }
   };
 
@@ -104,7 +107,7 @@ const Cart = () => {
                           <button
                             disabled={item.quantity === 1}
                             onClick={() =>
-                              updateQuantity(item.product.id, item.quantity - 1)
+                              updateQuantity(item.product.id, -1)
                             }
                             className="p-2 glass-card hover:glow-on-hover animate-smooth"
                           >
@@ -115,7 +118,7 @@ const Cart = () => {
                           </span>
                           <button
                             onClick={() =>
-                              updateQuantity(item.product.id, item.quantity + 1)
+                              updateQuantity(item.product.id, 1)
                             }
                             className="p-2 glass-card hover:glow-on-hover animate-smooth"
                           >

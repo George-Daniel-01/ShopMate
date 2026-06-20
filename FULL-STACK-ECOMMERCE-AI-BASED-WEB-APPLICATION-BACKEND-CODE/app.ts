@@ -24,9 +24,11 @@ cloudinary.config({
 
 const app = express();
 
+const frontendUrl = process.env.FRONTEND_URL || "https://shop-mate-six-azure.vercel.app";
+const dashboardUrl = process.env.DASHBOARD_URL || "https://shop-dashboard-tan.vercel.app";
 const allowedOrigins = [
-  "https://shop-mate-six-azure.vercel.app",
-  "https://shop-dashboard-tan.vercel.app",
+  frontendUrl,
+  dashboardUrl,
   "http://localhost:5173",
   "http://localhost:5174",
 ];

@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { X, Lock } from "lucide-react";
+import { X, Lock, AlertCircle, Mail } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
+import { openAuthPopup, setAuthPopupView, toggleAuthPopup } from "../../store/slices/popupSlice";
+import { resetPassword, forgotPassword } from "../../store/slices/authSlice";
 import { toast } from "react-toastify";
-import { toggleAuthPopup } from "../../store/slices/popupSlice";
-import { resetPassword } from "../../store/slices/authSlice";
 import type { AppDispatch } from "../../store/store";
 import type { RootState } from "../../types/index";
 
@@ -12,33 +12,45 @@ const ResetPasswordModal = () => {
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
   const { isUpdatingPassword } = useSelector((state: RootState) => state.auth);
-  const { isAuthPopupOpen } = useSelector((state: RootState) => state.popup);
+  const { isAuthPopupOpen, authPopupView } = useSelector((state: RootState) => state.popup);
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
 
   const token = location.pathname.split("/").pop() ?? "";
 
   useEffect(() => {
     if (location.pathname.startsWith("/password/reset/")) {
-      dispatch(toggleAuthPopup());
+      dispatch(setAuthPopupView("resetPassword"));
+      dispatch(openAuthPopup());
     }
   }, [location.pathname, dispatch]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
     if (password !== confirmPassword) {
-      toast.error("Passwords do not match");
+      setError("Passwords do not match");
       return;
     }
     if (password.length < 8 || password.length > 16) {
-      toast.error("Password must be between 8 and 16 characters");
+      setError("Password must be between 8 and 16 characters");
       return;
     }
-    dispatch(resetPassword({ token, password, confirmPassword }));
+    try {
+      await dispatch(resetPassword({ token, password, confirmPassword })).unwrap();
+    } catch (err: any) {
+      setError(err?.message || err || "Something went wrong");
+    }
   };
 
-  if (!isAuthPopupOpen) return null;
+  const handleResend = () => {
+    toast.info("Go to the forgot password page to request a new link.");
+    dispatch(setAuthPopupView("forgotPassword"));
+  };
+
+  if (!isAuthPopupOpen || authPopupView !== "resetPassword") return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -53,6 +65,24 @@ const ResetPasswordModal = () => {
             <X className="w-5 h-5 text-primary" />
           </button>
         </div>
+        {error && (
+          <div className="flex items-start gap-2 p-3 mb-4 rounded-lg bg-red-50 text-red-700 text-sm">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div>
+              <p>{error}</p>
+              {error.toLowerCase().includes("expired") || error.toLowerCase().includes("invalid") ? (
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  className="mt-1 flex items-center gap-1 text-red-700 font-medium underline hover:no-underline"
+                >
+                  <Mail className="w-4 h-4" />
+                  Request a new reset link
+                </button>
+              ) : null}
+            </div>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />

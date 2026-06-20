@@ -53,7 +53,7 @@ const CartSidebar = () => {
               <Link
                 to="/products"  // Fixed path
                 onClick={() => dispatch(toggleCart())}
-                className="inline-block mt-4 px-6 py-2 gradient-primary foreground rounded-lg hover:glow-on-hover animate-smooth"
+                className="inline-block mt-4 px-6 py-2 gradient-primary text-primary-foreground rounded-lg hover:glow-on-hover animate-smooth"
               >
                 Browse Products
               </Link>
@@ -102,7 +102,7 @@ const CartSidebar = () => {
                         className="p-1 rounded glass-card hover:glow-on-hover animate-smooth ml-2 text-destructive"
                         onClick={() => dispatch(removeFromCart({ id: item.product.id }))}
                       >
-                        <Trash2 className="w-4 h-4 text-destructive-foreground" />
+                        <Trash2 className="w-4 h-4 text-destructive" />
                       </button>
                     </div>
                   </div>

@@ -34,3 +34,5 @@ deployment_debug.txt
 target_code.txt
 project_explanation.*
 shopmate-postman-tests.*
+
+.vercel

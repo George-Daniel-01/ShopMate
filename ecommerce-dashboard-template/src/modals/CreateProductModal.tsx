@@ -2,12 +2,13 @@ import { useState, useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { createNewProduct } from "../store/slices/productsSlice";
 import { toggleCreateProductModal } from "../store/slices/extraSlice";
+import toast from "react-hot-toast";
 import { LoaderCircle } from "lucide-react";
 
 const categoryOptions = ["Electronics", "Fashion", "Home & Garden", "Sports", "Books", "Beauty", "Automotive", "Kids & Baby"];
 
 const CreateProductModal = () => {
-  const { actionLoading } = useAppSelector((state) => state.product as any);
+  const { actionLoading } = useAppSelector((state) => state.product);
   const dispatch = useAppDispatch();
   const [formData, setFormData] = useState({
     name: "", description: "", price: "", category: "Electronics", stock: "", images: [] as File[]
@@ -32,10 +33,10 @@ const CreateProductModal = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return alert("Please enter a product title.");
-    if (!formData.price) return alert("Please enter a price.");
-    if (!formData.stock) return alert("Please enter stock quantity.");
-    if (!formData.description.trim()) return alert("Please enter a description.");
+    if (!formData.name.trim()) return toast.error("Please enter a product title.");
+    if (!formData.price) return toast.error("Please enter a price.");
+    if (!formData.stock) return toast.error("Please enter stock quantity.");
+    if (!formData.description.trim()) return toast.error("Please enter a description.");
     if (actionLoading) return;
     const data = new FormData();
     data.append("name", formData.name);
@@ -62,7 +63,7 @@ const CreateProductModal = () => {
           <div className="col-span-1 md:col-span-2">
             <label className="block text-sm text-gray-600 mb-1">Product Images</label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors">
-              <p className="text-gray-500 text-sm mb-2">Paste (Ctrl+V) · Drag & Drop · or Choose Files</p>
+              <p className="text-gray-500 text-sm mb-2">Paste (Ctrl+V) ï¿½ Drag & Drop ï¿½ or Choose Files</p>
               <input type="file" multiple accept="image/*" onChange={(e) => addImages(Array.from(e.target.files ?? []))} className="hidden" id="fileInput" />
               <label htmlFor="fileInput" className="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded cursor-pointer text-sm">Choose Files</label>
             </div>

@@ -8,7 +8,7 @@ import type { AppDispatch } from "../store";
 // ? FIX: Added `actionLoading` separate from `loading`
 // `loading`       ? only for the initial products table fetch (shows spinner over table)
 // `actionLoading` ? for create / update / delete actions (never hides the table)
-const initialState: ProductState & { actionLoading: boolean } = {
+const initialState: ProductState = {
   loading: false,
   actionLoading: false,
   products: [],

@@ -1,19 +1,14 @@
 ﻿import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import axios from "axios";
+import { axiosInstance } from "../../lib/axios";
 import toast from "react-hot-toast";
-import type { AdminState, User } from "../../types/index";
+import type { AdminState, User, LowStockProduct } from "../../types/index";
 import type { AppDispatch } from "../store";
-
-const axiosInstance = axios.create({
-  baseURL: import.meta.env.MODE === "development" ? "http://localhost:4000/api/v1" : import.meta.env.VITE_API_URL,
-  withCredentials: true,
-});
 
 const initialState: AdminState = {
   loading: false, users: [], totalUsers: 0, totalRevenueAllTime: 0,
   todayRevenue: 0, yesterdayRevenue: 0, totalUsersCount: 0,
   monthlySales: [], orderStatusCounts: {}, topSellingProducts: [],
-  lowStockProducts: 0, revenueGrowth: "0%", newUsersThisMonth: 0, currentMonthSales: 0,
+  lowStockProducts: [], lowStockCount: 0, revenueGrowth: "0%", newUsersThisMonth: 0, currentMonthSales: 0,
 };
 
 export const adminSlice = createSlice({
@@ -43,7 +38,8 @@ export const adminSlice = createSlice({
       state.monthlySales = action.payload.monthlySales ?? [];
       state.orderStatusCounts = action.payload.orderStatusCounts ?? {};
       state.topSellingProducts = action.payload.topSellingProducts ?? [];
-      state.lowStockProducts = (action.payload as any).lowStockProducts?.length ?? 0;
+      state.lowStockProducts = action.payload.lowStockProducts ?? [];
+      state.lowStockCount = (action.payload.lowStockProducts ?? []).length;
       state.revenueGrowth = action.payload.revenueGrowth ?? "0%";
       state.newUsersThisMonth = action.payload.newUsersThisMonth ?? 0;
       state.currentMonthSales = action.payload.currentMonthSales ?? 0;

@@ -28,7 +28,7 @@ const Products = () => {
 
   // ✅ FIX: Destructure both loading (table fetch) and actionLoading (actions)
   const { products, totalProducts, loading, actionLoading } = useAppSelector(
-    (state) => state.product as any
+    (state) => state.product
   );
 
   useEffect(() => {

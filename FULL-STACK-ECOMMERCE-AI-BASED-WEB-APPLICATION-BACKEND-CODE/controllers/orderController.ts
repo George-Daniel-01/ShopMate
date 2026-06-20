@@ -33,53 +33,67 @@ export const placeNewOrder = catchAsyncErrors(
     const values: (string | number | null)[] = [];
     const placeholders: string[] = [];
 
-    items.forEach((item, index) => {
+    for (const item of items) {
       const product = products.find((p) => p.id === item.product.id);
       if (!product) {
-        next(new ErrorHandler(`Product not found for ID: ${item.product.id}`, 404));
-        return;
+        return next(new ErrorHandler(`Product not found for ID: ${item.product.id}`, 404));
       }
       if (item.quantity > product.stock) {
-        next(new ErrorHandler(`Only ${product.stock} units available for ${product.name}`, 400));
-        return;
+        return next(new ErrorHandler(`Only ${product.stock} units available for ${product.name}`, 400));
       }
       total_price += product.price * item.quantity;
-      values.push(null, product.id, item.quantity, product.price, item.product.images[0]?.url ?? "", product.name);
-      const offset = index * 6;
-      placeholders.push(
-        `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6})`
+    }
+
+    const taxRate = 0.18;
+    const shipping = total_price >= 50 ? 0 : 2;
+    const taxAmount = Math.round(total_price * taxRate);
+    const finalTotal = Math.round(total_price + taxAmount + shipping);
+
+    const client = await database.connect();
+    try {
+      await client.query("BEGIN");
+
+      const orderResult = await client.query<{ id: string }>(
+        `INSERT INTO orders (buyer_id, total_price, tax_price, shipping_price) VALUES ($1, $2, $3, $4) RETURNING *`,
+        [req.user.id, finalTotal, taxAmount, shipping]
       );
-    });
+      const orderId = orderResult.rows[0].id;
 
-    const tax_price = 0.18;
-    const shipping_price = total_price >= 50 ? 0 : 2;
-    total_price = Math.round(total_price + total_price * tax_price + shipping_price);
+      for (const [index, item] of items.entries()) {
+        const product = products.find((p) => p.id === item.product.id)!;
+        values.push(orderId, product.id, item.quantity, product.price, item.product.images[0]?.url ?? "", product.name);
+        const offset = index * 6;
+        placeholders.push(
+          `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6})`
+        );
+      }
 
-    const orderResult = await database.query<{ id: string }>(
-      `INSERT INTO orders (buyer_id, total_price, tax_price, shipping_price) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [req.user.id, total_price, tax_price, shipping_price]
-    );
-    const orderId = orderResult.rows[0].id;
+      await client.query(
+        `INSERT INTO order_items (order_id, product_id, quantity, price, image, title) VALUES ${placeholders.join(", ")}`,
+        values
+      );
+      await client.query(
+        `INSERT INTO shipping_info (order_id, full_name, state, city, country, address, pincode, phone) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [orderId, full_name, state, city, country, address, pincode, phone]
+      );
 
-    for (let i = 0; i < values.length; i += 6) values[i] = orderId;
+      await client.query("COMMIT");
 
-    await database.query(
-      `INSERT INTO order_items (order_id, product_id, quantity, price, image, title) VALUES ${placeholders.join(", ")} RETURNING *`,
-      values
-    );
-    await database.query(
-      `INSERT INTO shipping_info (order_id, full_name, state, city, country, address, pincode, phone) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [orderId, full_name, state, city, country, address, pincode, phone]
-    );
+      const paymentResponse = await generatePaymentIntent(orderId, finalTotal);
+      if (!paymentResponse.success) {
+        return next(new ErrorHandler("Payment failed. Try again.", 500));
+      }
 
-    const paymentResponse = await generatePaymentIntent(orderId, total_price);
-    if (!paymentResponse.success)
-      return next(new ErrorHandler("Payment failed. Try again.", 500));
-
-    res.status(200).json({
-      success: true, message: "Order placed successfully. Please proceed to payment.",
-      orderId, paymentIntent: paymentResponse.clientSecret, total_price,
-    });
+      res.status(200).json({
+        success: true, message: "Order placed successfully. Please proceed to payment.",
+        orderId, paymentIntent: paymentResponse.clientSecret, total_price: finalTotal,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      return next(new ErrorHandler("Failed to place order. Please try again.", 500));
+    } finally {
+      client.release();
+    }
   }
 );
 

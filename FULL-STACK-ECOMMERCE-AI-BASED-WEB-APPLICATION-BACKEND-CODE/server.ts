@@ -3,14 +3,20 @@ dotenv.config({ path: "./config/config.env" });
 
 import { connectDB } from "./database/db.js";
 import app from "./app.js";
-import { v2 as cloudinary } from "cloudinary";
 import { createTables } from "./utils/createTables.js";
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLIENT_NAME,
-  api_key: process.env.CLOUDINARY_CLIENT_API,
-  api_secret: process.env.CLOUDINARY_CLIENT_SECRET,
-});
+const requiredEnvVars = [
+  "DATABASE_URL", "JWT_SECRET_KEY", "JWT_EXPIRES_IN", "COOKIE_EXPIRES_IN",
+  "CLOUDINARY_CLIENT_NAME", "CLOUDINARY_CLIENT_API", "CLOUDINARY_CLIENT_SECRET",
+  "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET",
+  "SMTP_HOST", "SMTP_MAIL", "SMTP_PASSWORD",
+];
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    console.error(`Missing required environment variable: ${envVar}`);
+    if (process.env.VERCEL !== "1") process.exit(1);
+  }
+}
 
 // Only listen when running locally, NOT on Vercel
 if (process.env.VERCEL !== "1") {

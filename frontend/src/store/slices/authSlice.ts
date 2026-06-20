@@ -67,7 +67,7 @@ export const forgotPassword = createAsyncThunk<null, { email: string }>(
   async (data, thunkAPI) => {
     try {
       const res = await axiosInstance.post("/auth/password/forgot", data, {
-        params: { frontendUrl: "https://shop-mate-six-azure.vercel.app" },
+        params: { frontendUrl: import.meta.env.VITE_FRONTEND_URL || window.location.origin },
       });
       toast.success(res.data.message);
       return null;

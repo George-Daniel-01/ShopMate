@@ -225,7 +225,9 @@ export const postProductReview = catchAsyncErrors(
 export const deleteReview = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { productId } = req.params;
-    const review = await database.query("DELETE FROM reviews WHERE product_id = $1 AND user_id = $2 RETURNING *", [productId, req.user.id]);
+    const { reviewId } = req.body;
+    if (!reviewId) return next(new ErrorHandler("Review ID is required.", 400));
+    const review = await database.query("DELETE FROM reviews WHERE id = $1 AND product_id = $2 AND user_id = $3 RETURNING *", [reviewId, productId, req.user.id]);
     if (review.rows.length === 0) return next(new ErrorHandler("Review not found.", 404));
     const allReviews = await database.query<{ avg_rating: string }>(`SELECT AVG(rating) AS avg_rating FROM reviews WHERE product_id = $1`, [productId]);
     const updatedProduct = await database.query(`UPDATE products SET ratings = $1 WHERE id = $2 RETURNING *`, [allReviews.rows[0].avg_rating, productId]);

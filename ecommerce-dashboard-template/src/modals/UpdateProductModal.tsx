@@ -23,7 +23,7 @@ const UpdateProductModal = ({
 }) => {
   // ✅ FIX: Use actionLoading instead of loading so the modal spinner
   // doesn't conflict with the table's loading state
-  const { actionLoading } = useAppSelector((state) => state.product as any);
+  const { actionLoading } = useAppSelector((state) => state.product);
   const dispatch = useAppDispatch();
 
   const [formData, setFormData] = useState({

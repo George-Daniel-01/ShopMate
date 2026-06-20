@@ -73,10 +73,20 @@ const LoginModal = () => {
               "Sign In"
             )}
           </button>
+          <p className="mt-2 text-center">
+            <button
+              type="button"
+              onClick={() => dispatch(setAuthPopupView("forgotPassword"))}
+              className="text-sm text-primary hover:underline"
+            >
+              Forgot Password?
+            </button>
+          </p>
         </form>
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
           <button
+            type="button"
             onClick={() => dispatch(setAuthPopupView("register"))}
             className="text-primary hover:underline font-medium"
           >

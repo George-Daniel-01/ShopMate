@@ -106,6 +106,7 @@ const RegisterModal = () => {
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <button
+            type="button"
             onClick={() => dispatch(setAuthPopupView("login"))}
             className="text-primary hover:underline font-medium"
           >

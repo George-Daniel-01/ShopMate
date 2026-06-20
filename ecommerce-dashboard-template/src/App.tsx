@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import { ToastContainer } from "react-toastify";
+import { Toaster } from "react-hot-toast";
 import { useEffect } from "react";
 import Dashboard from "./components/Dashboard";
 import Orders from "./components/Orders";
@@ -57,6 +58,7 @@ function App() {
         } />
       </Routes>
       <ToastContainer position="bottom-center" />
+      <Toaster position="bottom-center" />
     </Router>
   );
 }

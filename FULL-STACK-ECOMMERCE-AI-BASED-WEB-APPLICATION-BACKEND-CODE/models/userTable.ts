@@ -8,7 +8,10 @@ export async function createUserTable() {
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL,
-        is_admin BOOLEAN DEFAULT FALSE,
+        role VARCHAR(10) DEFAULT 'User',
+        avatar JSONB DEFAULT NULL,
+        reset_password_token TEXT DEFAULT NULL,
+        reset_password_expire TIMESTAMP DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `;

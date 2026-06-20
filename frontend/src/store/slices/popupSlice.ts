@@ -16,7 +16,10 @@ const popupSlice = createSlice({
   reducers: {
     toggleAuthPopup(state) {
       state.isAuthPopupOpen = !state.isAuthPopupOpen;
-      if (state.isAuthPopupOpen) state.authPopupView = "login";
+      if (state.isAuthPopupOpen && !state.authPopupView.startsWith("reset")) state.authPopupView = "login";
+    },
+    openAuthPopup(state) {
+      state.isAuthPopupOpen = true;
     },
     setAuthPopupView(state, action) { state.authPopupView = action.payload; },
     toggleSidebar(state) { state.isSidebarOpen = !state.isSidebarOpen; },
@@ -26,5 +29,5 @@ const popupSlice = createSlice({
   },
 });
 
-export const { toggleAuthPopup, setAuthPopupView, toggleSidebar, toggleSearchBar, toggleCart, toggleAIModal } = popupSlice.actions;
+export const { toggleAuthPopup, openAuthPopup, setAuthPopupView, toggleSidebar, toggleSearchBar, toggleCart, toggleAIModal } = popupSlice.actions;
 export default popupSlice.reducer;

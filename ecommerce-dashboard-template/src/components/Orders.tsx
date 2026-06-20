@@ -5,9 +5,11 @@ import { deleteOrder, fetchAllOrders, updateOrderStatus } from "../store/slices/
 import type { Order, OrderItem } from "../types/index";
 
 const Orders = () => {
-  const statusArray = ["All", "Processing", "Shipped", "Delivered", "Cancelled"];
+  const statusFilters = ["All", "Processing", "Shipped", "Delivered", "Cancelled"];
+  const updateStatuses = ["Processing", "Shipped", "Delivered", "Cancelled"];
   const dispatch = useAppDispatch();
   const { orders, loading } = useAppSelector((state) => state.order);
+  const { user } = useAppSelector((state) => state.auth);
   const [selectedStatus, setSelectedStatus] = useState<Record<string, string>>({});
   const [filterByStatus, setFilterByStatus] = useState("All");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -41,7 +43,7 @@ const Orders = () => {
             <>
               <div className="flex justify-between items-center p-6">
                 <select value={filterByStatus} onChange={(e) => setFilterByStatus(e.target.value)} className="border p-2 rounded mb-2">
-                  {statusArray.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {statusFilters.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               {filteredOrders.map((order: Order) => (
@@ -54,8 +56,8 @@ const Orders = () => {
                       <p><strong>Total Amount:</strong> ${order.total_price}</p>
                     </div>
                     <div>
-                      <select value={selectedStatus[order.id] || order.order_status} onChange={(e) => handleStatusChange(order.id, e.target.value)} className="border p-2 rounded mb-2">
-                        {statusArray.map((s) => <option key={s} value={s}>{s}</option>)}
+                      <select value={selectedStatus[order.id] || order.order_status} onChange={(e) => handleStatusChange(order.id, e.target.value)} className="border p-2 rounded mb-2" disabled={user?.role !== "Admin"}>
+                        {updateStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                       <button onClick={() => setDeleteConfirm({ open: true, id: order.id })} className="ml-3 bg-red-500 hover:bg-red-600 text-white px-3 py-1">Delete</button>
                     </div>

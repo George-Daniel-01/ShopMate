@@ -12,14 +12,8 @@ const Payment = (): React.JSX.Element | null => {
   const navigateTo = useNavigate();
   if (!authUser) { navigateTo("/products"); return null; }
 
-  const [stripePromise, setStripePromise] = useState<import("@stripe/stripe-js").Stripe | null>(null);
-  useEffect(() => {
-    loadStripe(
-      import.meta.env.VITE_STRIPE_PUBLIC_KEY
-    )
-      .then((stripe) => { if (stripe) setStripePromise(stripe); })
-      .catch((err) => console.log(err));
-  }, []);
+  const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+  const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
 
   const dispatch = useAppDispatch();
   const { cart } = useAppSelector((state) => state.cart);
@@ -41,7 +35,7 @@ const Payment = (): React.JSX.Element | null => {
 
   let totalWithTax = total + total * 0.18;
 
-  if (total > 50) {
+  if (total < 50) {
     totalWithTax += 2;
   }
 
@@ -365,7 +359,7 @@ const Payment = (): React.JSX.Element | null => {
                           totalWithTax >= 50 ? "text-green-500" : ""
                         }`}
                       >
-                        {totalWithTax >= 50 ? "Free" : "$2"}
+                        {total >= 50 ? "Free" : "$2"}
                       </span>
                     </div>
                     <div className="flex justify-between">

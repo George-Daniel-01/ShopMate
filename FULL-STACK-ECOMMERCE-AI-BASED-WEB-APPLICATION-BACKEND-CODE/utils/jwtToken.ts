@@ -2,6 +2,11 @@
 import { Response } from "express";
 import { IUser } from "../types/index.js";
 
+const stripPassword = (user: IUser) => {
+  const { password, ...safeUser } = user;
+  return safeUser;
+};
+
 export const sendToken = (
   user: IUser,
   statusCode: number,
@@ -25,5 +30,5 @@ export const sendToken = (
       secure: true,
       sameSite: "none",
     })
-    .json({ success: true, user, message, token });
+    .json({ success: true, user: stripPassword(user), message, token });
 };
