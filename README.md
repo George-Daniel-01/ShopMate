@@ -7,9 +7,9 @@ A complete, production-ready e-commerce platform built with React, Node.js, Post
 ## Project Structure
 
 ```
-myWebsite/
-├── ecommerce-frontend-template/        # Customer storefront (React + Vite + TypeScript)
-├── ecommerce-dashboard-template/       # Admin dashboard (React + Vite + TypeScript)
+ShopMate/
+├── frontend/                            # Customer storefront (React + Vite + TypeScript)
+├── ecommerce-dashboard-template/        # Admin dashboard (React + Vite + TypeScript)
 └── FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE/   # Node.js API (TypeScript)
 ```
 
@@ -122,7 +122,7 @@ Database tables are created automatically on first run.
 ### 2. Frontend (Storefront) Setup
 
 ```bash
-cd ecommerce-frontend-template
+cd frontend
 npm install
 ```
 
