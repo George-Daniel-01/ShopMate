@@ -1,7 +1,6 @@
 ﻿import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { axiosInstance } from "../../lib/axios";
 import { toast } from "react-toastify";
-import { toggleAIModal } from "./popupSlice";
 import type { Product, Review, ProductState } from "../../types/index";
 import type { AppDispatch } from "../store";
 
@@ -79,11 +78,25 @@ export const fetchProductWithAI = createAsyncThunk<
 >("product/ai-search", async (userPrompt, thunkAPI) => {
   try {
     const res = await axiosInstance.post("/product/ai-search", { userPrompt });
-    (thunkAPI.dispatch as AppDispatch)(toggleAIModal());
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data?.message);
-    return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch AI Filtered products.");
+    console.error("AI search error:", error.response?.status, error.response?.data, error.message);
+    try {
+      const fallbackRes = await axiosInstance.get("/product", {
+        params: { search: userPrompt, limit: 50 },
+      });
+      return {
+        products: fallbackRes.data.products,
+        totalProducts: fallbackRes.data.totalProducts,
+      };
+    } catch {
+      const message =
+        typeof error.response?.data === "object"
+          ? error.response.data.message
+          : error.message || "AI search failed. Try again.";
+      toast.error(message);
+      return thunkAPI.rejectWithValue(message);
+    }
   }
 });
 
@@ -98,6 +111,7 @@ const initialState: ProductState = {
   isPostingReview: false,
   isReviewDeleting: false,
   aiSearching: false,
+  isAISearchResult: false,
 };
 
 const productSlice = createSlice({
@@ -109,6 +123,9 @@ const productSlice = createSlice({
       state.productReviews = [];
       state.loading = true;
     },
+    clearAISearchResult(state) {
+      state.isAISearchResult = false;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -119,6 +136,7 @@ const productSlice = createSlice({
         state.newProducts = action.payload.newProducts;
         state.topRatedProducts = action.payload.topRatedProducts;
         state.totalProducts = action.payload.totalProducts;
+        state.isAISearchResult = false;
       })
       .addCase(fetchAllProducts.rejected, (state) => { state.loading = false; })
       .addCase(fetchProductDetails.pending, (state) => { state.loading = true; state.productDetails = null; })
@@ -147,15 +165,16 @@ const productSlice = createSlice({
         state.productReviews = state.productReviews.filter((r) => r.review_id !== action.payload);
       })
       .addCase(deleteReview.rejected, (state) => { state.isReviewDeleting = false; })
-      .addCase(fetchProductWithAI.pending, (state) => { state.aiSearching = true; })
+      .addCase(fetchProductWithAI.pending, (state) => { state.aiSearching = true; state.isAISearchResult = false; })
       .addCase(fetchProductWithAI.fulfilled, (state, action) => {
         state.aiSearching = false;
+        state.isAISearchResult = true;
         state.products = action.payload.products;
-        state.totalProducts = action.payload.products.length;
+        state.totalProducts = action.payload.totalProducts;
       })
       .addCase(fetchProductWithAI.rejected, (state) => { state.aiSearching = false; });
   },
 });
 
-export const { resetProductDetails } = productSlice.actions;
+export const { resetProductDetails, clearAISearchResult } = productSlice.actions;
 export default productSlice.reducer;

@@ -230,22 +230,27 @@ export const aiSearchProducts = catchAsyncErrors(
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) return next(new ErrorHandler("AI search is not configured.", 503));
 
-    const systemPrompt = `You are a product search assistant. Extract structured search parameters from the user's natural language query.
-Return ONLY a valid JSON object with these optional fields:
+    const systemPrompt = `You are a product search assistant for an e-commerce store. Extract structured search parameters from the user's natural language query.
+Return ONLY a valid JSON object (no markdown, no backticks, no extra text) with these optional fields:
 - "search": string (product name or description keywords, or null)
 - "category": string (product category, or null)
-- "minPrice": number (minimum price, or null)
-- "maxPrice": number (maximum price, or null)
+- "minPrice": number (minimum price in dollars, or null)
+- "maxPrice": number (maximum price in dollars, or null)
 
 Examples:
 Input: "show me affordable running shoes under $100"
 Output: {"search": "running shoes", "category": null, "minPrice": null, "maxPrice": 100}
 
 Input: "expensive electronics"
-Output: {"search": null, "category": "electronics", "minPrice": 200, "maxPrice": null}`;
+Output: {"search": null, "category": "electronics", "minPrice": 200, "maxPrice": null}
+
+Input: "trendy sneakers"
+Output: {"search": "sneakers", "category": null, "minPrice": null, "maxPrice": null}`;
 
     let params: { search: string | null; category: string | null; minPrice: number | null; maxPrice: number | null };
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -258,17 +263,26 @@ Output: {"search": null, "category": "electronics", "minPrice": 200, "maxPrice":
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          response_format: { type: "json_object" },
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       if (!response.ok) {
         const errorText = await response.text();
-        return next(new ErrorHandler(`OpenRouter API error: ${errorText}`, 502));
+        throw new Error(`OpenRouter API error: ${errorText}`);
       }
       const data: any = await response.json();
-      params = JSON.parse(data.choices[0].message.content);
+      const rawContent = data.choices[0].message.content;
+      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("AI returned an invalid response format.");
+      params = JSON.parse(jsonMatch[0]);
     } catch (error: any) {
-      return next(new ErrorHandler(`AI search failed: ${error.message}`, 502));
+      console.error("AI search fallback due to:", error.message);
+      params = { search: userPrompt, category: null, minPrice: null, maxPrice: null };
+    }
+
+    if (!params || typeof params !== "object") {
+      params = { search: userPrompt, category: null, minPrice: null, maxPrice: null };
     }
 
     const conditions: string[] = [];

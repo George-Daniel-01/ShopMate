@@ -1,21 +1,36 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sparkles, X, Loader, Send, Bot } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { toggleAIModal } from "../../store/slices/popupSlice";
 import { fetchProductWithAI } from "../../store/slices/productSlice";
 
 const AISearchOverlay = () => {
   const [prompt, setPrompt] = useState("");
+  const [searchSubmitted, setSearchSubmitted] = useState(false);
   const dispatch = useAppDispatch();
-  const { isAIPopupOpen, aiSearching } = useAppSelector((state) => ({
+  const navigate = useNavigate();
+  const { isAIPopupOpen, aiSearching, isAISearchResult } = useAppSelector((state) => ({
     isAIPopupOpen: state.popup.isAIPopupOpen,
     aiSearching: state.product.aiSearching,
+    isAISearchResult: state.product.isAISearchResult,
   }));
+
+  useEffect(() => {
+    if (searchSubmitted && !aiSearching) {
+      if (isAISearchResult) {
+        dispatch(toggleAIModal());
+        navigate("/products", { state: { fromAISearch: true } });
+      }
+      setSearchSubmitted(false);
+    }
+  }, [searchSubmitted, aiSearching, isAISearchResult, dispatch, navigate]);
 
   if (!isAIPopupOpen) return null;
 
   const handleSearch = () => {
     if (prompt.trim() !== "") {
+      setSearchSubmitted(true);
       dispatch(fetchProductWithAI(prompt));
     }
   };

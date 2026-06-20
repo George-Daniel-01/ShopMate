@@ -5,16 +5,17 @@ import Pagination from "../components/Products/Pagination";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { useLocation } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
-import { fetchAllProducts } from "../store/slices/productSlice";
+import { fetchAllProducts, clearAISearchResult } from "../store/slices/productSlice";
 import { toggleAIModal } from "../store/slices/popupSlice";
 
 const Products = () => {
-  const { products, totalProducts, loading } = useAppSelector((state) => state.product);
+  const { products, totalProducts, loading, isAISearchResult } = useAppSelector((state) => state.product);
 
   const useQuery = () => {
     return new URLSearchParams(useLocation().search);
   };
 
+  const location = useLocation();
   const query = useQuery();
   const searchTerm = query.get("search");
   const searchedCategory = query.get("category");
@@ -50,6 +51,7 @@ const Products = () => {
   }, [searchQuery]);
 
   useEffect(() => {
+    if (isAISearchResult) return;
     dispatch(
       fetchAllProducts({
         category: selectedCategory,
@@ -60,7 +62,19 @@ const Products = () => {
         page: currentPage,
       })
     );
-  }, [dispatch, selectedCategory, priceRange, debouncedSearch, selectedRating, availability, currentPage]);
+  }, [dispatch, selectedCategory, priceRange[1], debouncedSearch, selectedRating, availability, currentPage, isAISearchResult]);
+
+  useEffect(() => {
+    if (isAISearchResult && !location.state?.fromAISearch) {
+      dispatch(clearAISearchResult());
+    }
+  }, [location]);
+
+  useEffect(() => {
+    if (isAISearchResult && (debouncedSearch || selectedCategory || priceRange[1] !== 10000 || selectedRating || availability)) {
+      dispatch(clearAISearchResult());
+    }
+  }, [debouncedSearch, selectedCategory, priceRange[1], selectedRating, availability]);
 
   const totalPages = Math.ceil(totalProducts / 10);
 
@@ -72,7 +86,8 @@ const Products = () => {
     setSelectedRating(0);
     setAvailability("");
     setCurrentPage(1);
-  }, []);
+    if (isAISearchResult) dispatch(clearAISearchResult());
+  }, [isAISearchResult, dispatch]);
 
   const hasActiveFilters =
     searchQuery !== "" ||
@@ -233,9 +248,9 @@ const Products = () => {
                   {products.length === 0 && (
                     <div className="text-center py-12">
                       <p className="text-muted-foreground text-lg mb-4">No products found matching your criteria.</p>
-                      {hasActiveFilters && (
+                      {(hasActiveFilters || isAISearchResult) && (
                         <button onClick={handleResetFilters} className="text-primary hover:underline text-sm">
-                          Clear all filters
+                          {isAISearchResult ? "Show all products" : "Clear all filters"}
                         </button>
                       )}
                     </div>

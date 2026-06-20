@@ -112,6 +112,7 @@ export interface ProductState {
   isPostingReview: boolean;
   isReviewDeleting: boolean;
   aiSearching: boolean;
+  isAISearchResult: boolean;
 }
 
 export interface OrderState {
