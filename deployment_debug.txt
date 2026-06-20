@@ -1,4 +1,0 @@
-Project: ShopMate
-Date: 06/04/2026 00:19:12
-Node: v24.15.0
-NPM: 11.12.1
