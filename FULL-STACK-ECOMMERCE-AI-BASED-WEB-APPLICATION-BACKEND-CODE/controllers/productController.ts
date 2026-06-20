@@ -265,7 +265,7 @@ Output: {"search": null, "category": "electronics", "minPrice": 200, "maxPrice":
         const errorText = await response.text();
         return next(new ErrorHandler(`OpenRouter API error: ${errorText}`, 502));
       }
-      const data = await response.json();
+      const data: any = await response.json();
       params = JSON.parse(data.choices[0].message.content);
     } catch (error: any) {
       return next(new ErrorHandler(`AI search failed: ${error.message}`, 502));
