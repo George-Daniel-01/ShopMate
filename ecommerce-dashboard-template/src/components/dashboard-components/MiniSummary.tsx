@@ -3,7 +3,7 @@ import { useAppSelector } from "../../store/hooks";
 
 const MiniSummary = () => {
   const { topSellingProducts, lowStockCount, revenueGrowth, newUsersThisMonth, currentMonthSales, orderStatusCounts } = useAppSelector((state) => state.admin);
-  const totalOrders = Object.values(orderStatusCounts).reduce((acc, count) => acc + (count ?? 0), 0);
+  const totalOrders = Object.values(orderStatusCounts).reduce((acc: number, count) => acc + (count ?? 0), 0);
 
   const summary = [
     { text: "Total Sales this Month", subText: `This month sales: PKR ${currentMonthSales * 283}`, icon: <Wallet className="text-green-600" /> },
