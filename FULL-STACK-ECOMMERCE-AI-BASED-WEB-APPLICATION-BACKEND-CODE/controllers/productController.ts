@@ -145,7 +145,7 @@ export const updateProduct = catchAsyncErrors(
 
     if (name) updates.name = name;
     if (description) updates.description = description;
-    if (price && !isNaN(price)) updates.price = price;
+    if (price !== null && !isNaN(price)) updates.price = price;
     if (category) updates.category = category;
     if (stock && !isNaN(stock)) updates.stock = stock;
 
@@ -330,7 +330,7 @@ Output: {"search": "sneakers", "category": null, "minPrice": null, "maxPrice": n
 export const deleteReview = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { productId } = req.params;
-    const { reviewId } = req.body;
+    const reviewId = req.query.reviewId as string;
     if (!reviewId) return next(new ErrorHandler("Review ID is required.", 400));
     const review = await database.query("DELETE FROM reviews WHERE id = $1 AND product_id = $2 AND user_id = $3 RETURNING *", [reviewId, productId, req.user.id]);
     if (review.rows.length === 0) return next(new ErrorHandler("Review not found.", 404));

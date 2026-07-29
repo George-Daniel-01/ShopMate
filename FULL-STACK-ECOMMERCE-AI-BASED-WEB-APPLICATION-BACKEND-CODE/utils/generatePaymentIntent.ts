@@ -1,12 +1,13 @@
 ﻿import { database } from "../database/db.js";
 import Stripe from "stripe";
 import { IPaymentResult } from "../types/index.js";
+import { env } from "./env.js";
 
 export async function generatePaymentIntent(
   orderId: string,
   totalPrice: number
 ): Promise<IPaymentResult> {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+  const stripe = new Stripe(env("STRIPE_SECRET_KEY"));
   try {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: totalPrice * 100,

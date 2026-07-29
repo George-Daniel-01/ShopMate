@@ -15,11 +15,12 @@ import { database } from "./database/db.js";
 
 config({ path: "./config/config.env" });
 
+import { env, envNum } from "./utils/env.js";
 
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLIENT_NAME,
-  api_key:    process.env.CLOUDINARY_CLIENT_API,
-  api_secret: process.env.CLOUDINARY_CLIENT_SECRET,
+  cloud_name: env("CLOUDINARY_CLIENT_NAME"),
+  api_key:    env("CLOUDINARY_CLIENT_API"),
+  api_secret: env("CLOUDINARY_CLIENT_SECRET"),
 });
 
 const app = express();
@@ -54,15 +55,25 @@ app.post(
   "/api/v1/payment/webhook",
   express.raw({ type: "application/json" }),
   async (req: Request, res: Response) => {
-    const sig = req.headers["stripe-signature"] as string;
+    const sig = req.headers["stripe-signature"];
+    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+    const payload = req.body;
+    if (!payload || !Buffer.isBuffer(payload)) {
+      res.status(400).send("Webhook Error: No payload provided.");
+      return;
+    }
+    if (!sig) {
+      res.status(400).send("Webhook Error: No stripe-signature header.");
+      return;
+    }
+    if (!secret) {
+      res.status(500).send("Webhook Error: Webhook secret not configured.");
+      return;
+    }
     let event: Stripe.Event;
 
     try {
-      event = Stripe.webhooks.constructEvent(
-        req.body as Buffer,
-        sig,
-        process.env.STRIPE_WEBHOOK_SECRET as string
-      );
+      event = Stripe.webhooks.constructEvent(payload, sig, secret);
     } catch (error) {
       res.status(400).send(`Webhook Error: ${(error as Error).message}`);
       return;

@@ -98,7 +98,7 @@ export const placeNewOrder = catchAsyncErrors(
 );
 
 export const fetchSingleOrder = catchAsyncErrors(
-  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { orderId } = req.params;
     const result = await database.query(
       `SELECT o.*,
@@ -116,6 +116,7 @@ export const fetchSingleOrder = catchAsyncErrors(
        WHERE o.id = $1 GROUP BY o.id, s.id;`,
       [orderId]
     );
+    if (!result.rows[0]) return next(new ErrorHandler("Order not found.", 404));
     res.status(200).json({ success: true, message: "Order fetched.", orders: result.rows[0] });
   }
 );

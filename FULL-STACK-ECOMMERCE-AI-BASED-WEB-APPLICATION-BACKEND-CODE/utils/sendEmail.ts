@@ -1,4 +1,5 @@
 ﻿import nodeMailer, { SentMessageInfo } from "nodemailer";
+import { env, envNum } from "./env.js";
 
 interface SendEmailOptions {
   email: string;
@@ -12,18 +13,18 @@ export const sendEmail = async ({
   message,
 }: SendEmailOptions): Promise<SentMessageInfo> => {
   const transporter = nodeMailer.createTransport({
-    host: process.env.SMTP_HOST as string,
-    port: parseInt(process.env.SMTP_PORT as string),
+    host: env("SMTP_HOST"),
+    port: envNum("SMTP_PORT"),
     secure: true,
     auth: {
-      user: process.env.SMTP_MAIL as string,
-      pass: process.env.SMTP_PASSWORD as string,
+      user: env("SMTP_MAIL"),
+      pass: env("SMTP_PASSWORD"),
     },
     tls: { rejectUnauthorized: false },
   });
 
   const mailOptions = {
-    from: process.env.SMTP_MAIL as string,
+    from: env("SMTP_MAIL"),
     to: email,
     subject,
     html: message,

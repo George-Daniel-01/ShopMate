@@ -4,6 +4,7 @@ import { catchAsyncErrors } from "./catchAsyncError.js";
 import ErrorHandler from "./errorMiddleware.js";
 import { database } from "../database/db.js";
 import { IUser } from "../types/index.js";
+import { env } from "../utils/env.js";
 
 declare global {
   namespace Express {
@@ -29,7 +30,7 @@ export const isAuthenticated = catchAsyncErrors(
 
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET_KEY as string
+      env("JWT_SECRET_KEY")
     ) as DecodedToken;
 
     const user = await database.query<IUser>(

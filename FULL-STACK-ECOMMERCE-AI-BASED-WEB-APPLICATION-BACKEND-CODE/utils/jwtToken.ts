@@ -1,6 +1,7 @@
 ﻿import jwt, { SignOptions } from "jsonwebtoken";
 import { Response } from "express";
 import { IUser } from "../types/index.js";
+import { env, envNum } from "./env.js";
 
 const stripPassword = (user: IUser) => {
   const { password, ...safeUser } = user;
@@ -13,11 +14,11 @@ export const sendToken = (
   message: string,
   res: Response
 ): void => {
-  const secret = process.env.JWT_SECRET_KEY as string;
-  const cookieExpireDays = Number(process.env.COOKIE_EXPIRES_IN);
+  const secret = env("JWT_SECRET_KEY");
+  const cookieExpireDays = envNum("COOKIE_EXPIRES_IN");
 
   const options: SignOptions = {
-    expiresIn: (process.env.JWT_EXPIRES_IN as SignOptions["expiresIn"]),
+    expiresIn: env("JWT_EXPIRES_IN") as SignOptions["expiresIn"],
   };
 
   const token = jwt.sign({ id: user.id }, secret, options);
