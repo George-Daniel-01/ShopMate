@@ -1,4 +1,4 @@
-﻿import jwt, { SignOptions } from "jsonwebtoken";
+import jwt, { SignOptions } from "jsonwebtoken";
 import { Response } from "express";
 import { IUser } from "../types/index.js";
 import { env, envNum } from "./env.js";
@@ -21,7 +21,8 @@ export const sendToken = (
     expiresIn: env("JWT_EXPIRES_IN") as SignOptions["expiresIn"],
   };
 
-  const token = jwt.sign({ id: user.id }, secret, options);
+  const userId = user.uuid || user.id;
+  const token = jwt.sign({ id: userId }, secret, options);
 
   res
     .status(statusCode)
