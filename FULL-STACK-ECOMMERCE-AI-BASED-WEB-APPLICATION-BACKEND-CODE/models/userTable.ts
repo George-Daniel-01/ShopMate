@@ -36,9 +36,9 @@ export async function createUserTable() {
       } catch { }
     }
 
-    console.log("âœ… Users table created or already exists");
+    console.log("✅ Users table created or already exists");
   } catch (error) {
-    console.error("âŒ Failed To Create Users Table.", error);
+    console.error("❌ Failed To Create Users Table.", error);
     throw error;
   }
 }

@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+﻿import { Request, Response, NextFunction } from "express";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
 import { database } from "../database/db.js";
@@ -25,7 +25,7 @@ export const register = catchAsyncErrors(
       return next(new ErrorHandler("User already registered with this email.", 400));
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await database.query<IUser>(
-      "INSERT INTO users (uuid, name, email, password) VALUES (gen_random_uuid(), $1, $2, $3) RETURNING *",
+      "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *",
       [name, email, hashedPassword]
     );
     sendToken(user.rows[0], 201, "User registered successfully", res);
@@ -115,9 +115,9 @@ export const resetPassword = catchAsyncErrors(
     if (password.length < 8 || password.length > 16)
       return next(new ErrorHandler("Password must be between 8 and 16 characters.", 400));
     const hashedPassword = await bcrypt.hash(password, 10);
-    const userId = user.rows[0].uuid || user.rows[0].id;
+    const userId = user.rows[0].id;
     const updatedUser = await database.query<IUser>(
-      `UPDATE users SET password = $1, reset_password_token = NULL, reset_password_expire = NULL WHERE uuid = $2 OR id = $2 RETURNING *`,
+      `UPDATE users SET password = $1, reset_password_token = NULL, reset_password_expire = NULL WHERE id = $2 RETURNING *`,
       [hashedPassword, userId]
     );
     sendToken(updatedUser.rows[0], 200, "Password reset successfully", res);
@@ -139,7 +139,7 @@ export const updatePassword = catchAsyncErrors(
     if (newPassword.length < 8 || newPassword.length > 16)
       return next(new ErrorHandler("Password must be between 8 and 16 characters.", 400));
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await database.query("UPDATE users SET password = $1 WHERE uuid = $2", [hashedPassword, req.user.uuid || req.user.id]);
+    await database.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, req.user.id]);
     res.status(200).json({ success: true, message: "Password updated successfully." });
   }
 );
@@ -162,16 +162,16 @@ export const updateProfile = catchAsyncErrors(
       });
       avatarData = { public_id: newProfileImage.public_id, url: newProfileImage.secure_url };
     }
-    const userPk = req.user.uuid || req.user.id;
+    const userPk = req.user.id;
     let user;
     if (Object.keys(avatarData).length === 0) {
       user = await database.query<IUser>(
-        "UPDATE users SET name = $1, email = $2 WHERE uuid = $3 RETURNING *",
+        "UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING *",
         [name, email, userPk]
       );
     } else {
       user = await database.query<IUser>(
-        "UPDATE users SET name = $1, email = $2, avatar = $3 WHERE uuid = $4 RETURNING *",
+        "UPDATE users SET name = $1, email = $2, avatar = $3 WHERE id = $4 RETURNING *",
         [name, email, avatarData, userPk]
       );
     }
