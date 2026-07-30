@@ -53,23 +53,26 @@ app.use(cors({
 
 app.post(
   "/api/v1/payment/webhook",
-  express.raw({ type: "application/json" }),
   async (req: Request, res: Response) => {
     const sig = req.headers["stripe-signature"];
-    const secret = process.env.STRIPE_WEBHOOK_SECRET;
-    const payload = req.body;
-    if (!payload || !Buffer.isBuffer(payload)) {
-      res.status(400).send("Webhook Error: No payload provided.");
-      return;
-    }
+    const secret = env("STRIPE_WEBHOOK_SECRET");
+
     if (!sig) {
       res.status(400).send("Webhook Error: No stripe-signature header.");
       return;
     }
-    if (!secret) {
-      res.status(500).send("Webhook Error: Webhook secret not configured.");
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) {
+      chunks.push(Buffer.from(chunk));
+    }
+    const payload = Buffer.concat(chunks);
+
+    if (payload.length === 0) {
+      res.status(400).send("Webhook Error: Empty payload.");
       return;
     }
+
     let event: Stripe.Event;
 
     try {
