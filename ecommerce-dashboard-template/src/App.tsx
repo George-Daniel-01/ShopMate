@@ -54,7 +54,7 @@ function App() {
         <Route path="/password/forgot" element={<ForgotPassword />} />
         <Route path="/password/reset/:token" element={<ResetPassword />} />
         <Route path="/" element={
-          isAuthenticated && user?.role === "Admin" ? (
+          isAuthenticated && user?.role === "ADMIN" ? (
             <div className="flex min-h-screen"><SideBar />{renderDashboardContent()}</div>
           ) : <Navigate to="/login" />
         } />

@@ -39,7 +39,7 @@ export const login = (data: FormData) => async (dispatch: AppDispatch) => {
   dispatch(authSlice.actions.loginRequest());
   try {
     const res = await axiosInstance.post("/auth/login", data);
-    if (res.data.user.role === "Admin") {
+    if (res.data.user.role === "ADMIN") {
       localStorage.setItem("token", res.data.token);
       dispatch(authSlice.actions.loginSuccess(res.data.user));
       toast.success(res.data.message);
