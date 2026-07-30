@@ -21,7 +21,7 @@ const ViewProductModal = ({ selectedProduct }: { selectedProduct: Product | null
             <p><strong>ID:</strong> {selectedProduct.id}</p>
             <p><strong>Description:</strong> {selectedProduct.description}</p>
             <p><strong>Category:</strong> {selectedProduct.category}</p>
-            <p><strong>Price:</strong> Rs {selectedProduct.price.toLocaleString()}</p>
+            <p><strong>Price:</strong> ${Number(selectedProduct.price).toFixed(2)}</p>
             <p><strong>Ratings:</strong> ⭐ {selectedProduct.ratings}</p>
             <p><strong>Stock:</strong> {selectedProduct.stock > 0 ? `In Stock (${selectedProduct.stock})` : "Out of Stock"}</p>
             <p><strong>Created At:</strong> {new Date(selectedProduct.created_at).toLocaleDateString()}</p>

@@ -1,5 +1,13 @@
 # ShopMate — Full-Stack AI-Based E-Commerce Web Application
 
+[![CI](https://github.com/George-Daniel-01/ShopMate/actions/workflows/ci.yml/badge.svg)](https://github.com/George-Daniel-01/ShopMate/actions/workflows/ci.yml)
+[![Vercel](https://img.shields.io/badge/storefront-deployed-000?logo=vercel)](https://shop-mate-six-azure.vercel.app)
+[![Vercel](https://img.shields.io/badge/dashboard-deployed-000?logo=vercel)](https://shop-dashboard-tan.vercel.app)
+[![Vercel](https://img.shields.io/badge/backend-deployed-000?logo=vercel)](https://shop-mate-backend.vercel.app)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev)
+[![Stripe](https://img.shields.io/badge/Stripe-integrated-008CDD?logo=stripe)](https://stripe.com)
+
 A complete, production-ready e-commerce platform built with React, Node.js, PostgreSQL, and AI-powered product search. Includes a customer-facing storefront, an admin dashboard, and a REST API backend. The entire codebase is written in **strict TypeScript**.
 
 ---
@@ -20,7 +28,7 @@ ShopMate/
 ### Storefront (Customer-Facing)
 - Hero slider, category grid, new arrivals, and top-rated product sections
 - Product listing with filters: category, price range, rating, availability
-- AI-powered product search using Google Gemini
+- AI-powered product search using OpenRouter (GPT-4o-mini)
 - Product detail pages with image gallery and customer reviews
 - Shopping cart with quantity management
 - Multi-step checkout with Stripe payment integration
@@ -43,7 +51,7 @@ ShopMate/
 - Cloudinary integration for image storage
 - Stripe payment intents and webhook handling
 - Password reset via email (Nodemailer)
-- AI product recommendation endpoint (Google Gemini 2.0 Flash)
+- AI product recommendation endpoint (OpenRouter / GPT-4o-mini)
 
 ---
 
@@ -57,7 +65,7 @@ ShopMate/
 | Authentication | JWT, bcrypt, HTTP-only cookies |
 | Payments | Stripe (Payment Intents + Webhooks) |
 | Image Storage | Cloudinary |
-| AI Search | Google Gemini 2.0 Flash API |
+| AI Search | OpenRouter (GPT-4o-mini) |
 | Email | Nodemailer (SMTP) |
 | Deployment | Vercel (frontend + backend) |
 
@@ -97,7 +105,7 @@ CLOUDINARY_CLIENT_SECRET=your_api_secret
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
-GEMINI_API_KEY=your_gemini_api_key
+OPENROUTER_API_KEY=your_openrouter_api_key
 
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
@@ -271,7 +279,7 @@ https://your-backend.vercel.app/api/v1/payment/webhook
 ## Key Implementation Notes
 
 - **TypeScript**: All three projects use strict TypeScript with full type coverage across components, Redux slices, API handlers, and database queries.
-- **Currency**: Prices are stored internally in USD. The backend divides incoming prices by 283 on creation/update to convert from PKR to USD.
+- **Currency**: Prices are stored internally as numeric values. It is up to the frontend to display the appropriate currency symbol.
 - **Reviews**: Users can only review products from orders with status `Delivered`.
 - **Stock**: Automatically decremented when a Stripe `payment_intent.succeeded` webhook is received.
 - **AI Search**: Filters products from the database by keyword first, then passes up to 200 matches to Gemini for intelligent ranking.

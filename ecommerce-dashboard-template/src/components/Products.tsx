@@ -102,7 +102,7 @@ const Products = () => {
                       >
                         <td className="py-3 px-4">
                           <img
-                            src={product?.images[0]?.url}
+                            src={product?.images?.[0]?.url || "/placeholder.png"}
                             alt={product.name}
                             className="w-10 h-10 rounded-md object-cover"
                           />

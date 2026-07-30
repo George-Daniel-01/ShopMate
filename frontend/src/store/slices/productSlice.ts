@@ -62,7 +62,7 @@ export const deleteReview = createAsyncThunk<string, { productId: string; review
   "product/delete/review",
   async ({ productId, reviewId }, thunkAPI) => {
     try {
-      const res = await axiosInstance.delete(`/product/delete/review/${productId}`, { data: { reviewId } });
+      const res = await axiosInstance.delete(`/product/delete/review/${productId}`, { params: { reviewId } });
       toast.success(res.data.message);
       return reviewId;
     } catch (error: any) {

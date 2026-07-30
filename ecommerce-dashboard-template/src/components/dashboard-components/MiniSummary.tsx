@@ -6,7 +6,7 @@ const MiniSummary = () => {
   const totalOrders = Object.values(orderStatusCounts).reduce((acc: number, count) => acc + (count ?? 0), 0);
 
   const summary = [
-    { text: "Total Sales this Month", subText: `This month sales: PKR ${currentMonthSales * 283}`, icon: <Wallet className="text-green-600" /> },
+    { text: "Total Sales this Month", subText: `This month sales: $${currentMonthSales}`, icon: <Wallet className="text-green-600" /> },
     { text: "Total Orders Placed", subText: `Total orders: ${totalOrders}`, icon: <PackageCheck className="text-blue-600" /> },
     { text: "Top Selling Product", subText: `Best Seller: ${topSellingProducts[0]?.name} (${topSellingProducts[0]?.total_sold} sold)`, icon: <TrendingUp className="text-emerald-600" /> },
     { text: "Low Stock Alerts", subText: `${lowStockCount} products running low`, icon: <AlertTriangle className="text-red-600" /> },

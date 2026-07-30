@@ -30,22 +30,22 @@ const Orders = () => {
 
   return (
     <main className="p-[10px] pl-[10px] md:pl-[17rem] w-full">
-      <div className="flex justify-between items-center p-6">
+      <div className="p-6">
         <Header />
-        <h1 className="text-2xl font-bold">All Orders</h1>
+        <h1 className="text-2xl font-bold mt-4">All Orders</h1>
         <p className="text-sm text-gray-600 mb-6">Manage all your orders.</p>
       </div>
       {loading ? (
         <div className="w-40 h-40 mx-auto border-2 border-white border-t-transparent rounded-full animate-spin" />
       ) : (
         <>
+          <div className="flex justify-between items-center p-6">
+            <select value={filterByStatus} onChange={(e) => setFilterByStatus(e.target.value)} className="border p-2 rounded mb-2">
+              {statusFilters.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
           {filteredOrders.length === 0 ? <p className="p-10">No orders found.</p> : (
             <>
-              <div className="flex justify-between items-center p-6">
-                <select value={filterByStatus} onChange={(e) => setFilterByStatus(e.target.value)} className="border p-2 rounded mb-2">
-                  {statusFilters.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
               {filteredOrders.map((order: Order) => (
                 <div key={order.id} className="bg-white shadow-lg rounded-lg p-6 mb-6">
                   <div className="flex justify-between items-start flex-wrap gap-4">
@@ -92,8 +92,8 @@ const Orders = () => {
         </div>
       )}
       {deleteConfirm.open && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
-          <div className="bg-white p-6 rounded shadow-lg text-center max-w-sm w-full">
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50" onClick={() => setDeleteConfirm({ open: false, id: null })}>
+          <div className="bg-white p-6 rounded shadow-lg text-center max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-4">Are you sure you want to delete this order?</h3>
             <div className="flex justify-center gap-4">
               <button onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Yes, Delete</button>

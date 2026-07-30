@@ -3,7 +3,6 @@ import SideBar from "./components/SideBar";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import { ToastContainer } from "react-toastify";
 import { Toaster } from "react-hot-toast";
 import { useEffect } from "react";
 import Dashboard from "./components/Dashboard";
@@ -23,8 +22,11 @@ function App() {
 
   useEffect(() => {
     dispatch(getUser());
-    dispatch(getDashboardStats());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (isAuthenticated) dispatch(getDashboardStats());
+  }, [dispatch, isAuthenticated]);
 
   const renderDashboardContent = () => {
     switch (openedComponent) {
@@ -56,8 +58,8 @@ function App() {
             <div className="flex min-h-screen"><SideBar />{renderDashboardContent()}</div>
           ) : <Navigate to="/login" />
         } />
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
-      <ToastContainer position="bottom-center" />
       <Toaster position="bottom-center" />
     </Router>
   );

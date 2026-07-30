@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { axiosInstance } from "../../lib/axios";
-import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import type { AuthState, User } from "../../types/index";
 import type { AppDispatch } from "../store";
 
