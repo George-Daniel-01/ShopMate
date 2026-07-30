@@ -8,7 +8,7 @@ const Login = () => {
   const dispatch = useAppDispatch();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
 
-  if (isAuthenticated && user?.role === "Admin") return <Navigate to="/" />;
+  if (isAuthenticated && user?.role === "ADMIN") return <Navigate to="/" />;
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();

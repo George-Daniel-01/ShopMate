@@ -209,7 +209,7 @@ export const registerAdmin = catchAsyncErrors(
       return next(new ErrorHandler("User already registered with this email.", 400));
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await database.query<IUser>(
-      "INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, 'Admin') RETURNING *",
+      "INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, 'ADMIN') RETURNING *",
       [name, email, hashedPassword]
     );
     sendToken(user.rows[0], 201, "Admin registered successfully", res);

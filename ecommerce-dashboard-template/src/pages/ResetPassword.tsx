@@ -9,7 +9,7 @@ const ResetPassword = () => {
   const dispatch = useAppDispatch();
   const { user, isAuthenticated, loading } = useAppSelector((state) => state.auth);
 
-  if (isAuthenticated && user?.role === "Admin") return <Navigate to="/" />;
+  if (isAuthenticated && user?.role === "ADMIN") return <Navigate to="/" />;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

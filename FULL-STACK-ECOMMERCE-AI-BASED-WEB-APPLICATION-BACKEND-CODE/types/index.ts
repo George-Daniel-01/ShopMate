@@ -5,7 +5,7 @@ export interface IUser {
   name: string;
   email: string;
   password: string;
-  role: "User" | "Admin";
+  role: "USER" | "ADMIN";
   avatar: { public_id: string; url: string } | null;
   reset_password_token: string | null;
   reset_password_expire: Date | null;

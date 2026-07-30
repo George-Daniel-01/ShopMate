@@ -56,7 +56,7 @@ const Orders = () => {
                       <p><strong>Total Amount:</strong> ${order.total_price}</p>
                     </div>
                     <div>
-                      <select value={selectedStatus[order.id] || order.order_status} onChange={(e) => handleStatusChange(order.id, e.target.value)} className="border p-2 rounded mb-2" disabled={user?.role !== "Admin"}>
+                      <select value={selectedStatus[order.id] || order.order_status} onChange={(e) => handleStatusChange(order.id, e.target.value)} className="border p-2 rounded mb-2" disabled={user?.role !== "ADMIN"}>
                         {updateStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                       <button onClick={() => setDeleteConfirm({ open: true, id: order.id })} className="ml-3 bg-red-500 hover:bg-red-600 text-white px-3 py-1">Delete</button>
