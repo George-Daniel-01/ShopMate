@@ -16,6 +16,17 @@ export async function createUserTable() {
       );
     `;
     await database.query(query);
+
+    const migrations = [
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_token TEXT DEFAULT NULL`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_expire TIMESTAMP DEFAULT NULL`,
+    ];
+    for (const m of migrations) {
+      try {
+        await database.query(m);
+      } catch { }
+    }
+
     console.log("✅ Users table created or already exists");
   } catch (error) {
     console.error("❌ Failed To Create Users Table.", error);
