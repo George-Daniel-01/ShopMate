@@ -6,6 +6,7 @@ import {
   logout,
   register,
   registerAdmin,
+  makeAdmin,
   resetPassword,
   updatePassword,
   updateProfile,
@@ -16,6 +17,7 @@ const router = express.Router();
 
 router.post("/register", register);
 router.post("/register-admin", registerAdmin);
+router.post("/make-admin", makeAdmin);
 router.post("/login", login);
 router.get("/me", isAuthenticated, getUser);
 router.get("/logout", isAuthenticated, logout);

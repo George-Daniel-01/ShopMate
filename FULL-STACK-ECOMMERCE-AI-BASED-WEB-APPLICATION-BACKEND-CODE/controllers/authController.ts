@@ -179,6 +179,20 @@ export const updateProfile = catchAsyncErrors(
   }
 );
 
+export const makeAdmin = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { email } = req.body as { email: string };
+    if (!email) return next(new ErrorHandler("Please provide email.", 400));
+    const user = await database.query<IUser>(
+      "UPDATE users SET role = 'Admin' WHERE email = $1 RETURNING *",
+      [email]
+    );
+    if (user.rows.length === 0)
+      return next(new ErrorHandler("User not found.", 404));
+    res.status(200).json({ success: true, message: "User promoted to Admin.", user: user.rows[0] });
+  }
+);
+
 export const registerAdmin = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { name, email, password, adminSecretKey } = req.body as {
