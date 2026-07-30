@@ -29,6 +29,7 @@ export async function createUserTable() {
     try { await database.query(`ALTER TABLE users RENAME COLUMN uuid TO id`); } catch { }
     try { await database.query(`ALTER TABLE users ALTER COLUMN id SET DEFAULT gen_random_uuid()`); } catch { }
     try { await database.query(`ALTER TABLE users ALTER COLUMN id SET NOT NULL`); } catch { }
+    try { await database.query(`ALTER TABLE users ALTER COLUMN uuid SET DEFAULT gen_random_uuid()`); } catch { }
     for (const m of migrations) {
       try {
         await database.query(m);
