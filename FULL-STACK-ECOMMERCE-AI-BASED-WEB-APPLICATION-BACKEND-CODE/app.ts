@@ -62,11 +62,17 @@ app.post(
       return;
     }
 
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      chunks.push(Buffer.from(chunk));
+    let payload: Buffer;
+    if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+      payload = req.body;
+    } else {
+      payload = await new Promise<Buffer>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        req.on("data", (chunk: Buffer) => chunks.push(chunk));
+        req.on("end", () => resolve(Buffer.concat(chunks)));
+        req.on("error", reject);
+      });
     }
-    const payload = Buffer.concat(chunks);
 
     if (payload.length === 0) {
       res.status(400).send("Webhook Error: Empty payload.");
