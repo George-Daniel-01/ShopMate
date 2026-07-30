@@ -18,6 +18,7 @@ export async function createUserTable() {
     await database.query(query);
 
     const migrations = [
+      `CREATE EXTENSION IF NOT EXISTS pgcrypto`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255) NOT NULL DEFAULT 'temp_password'`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(10) DEFAULT 'User'`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar JSONB DEFAULT NULL`,
@@ -25,6 +26,9 @@ export async function createUserTable() {
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_expire TIMESTAMP DEFAULT NULL`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
     ];
+    try { await database.query(`ALTER TABLE users RENAME COLUMN uuid TO id`); } catch { }
+    try { await database.query(`ALTER TABLE users ALTER COLUMN id SET DEFAULT gen_random_uuid()`); } catch { }
+    try { await database.query(`ALTER TABLE users ALTER COLUMN id SET NOT NULL`); } catch { }
     for (const m of migrations) {
       try {
         await database.query(m);
