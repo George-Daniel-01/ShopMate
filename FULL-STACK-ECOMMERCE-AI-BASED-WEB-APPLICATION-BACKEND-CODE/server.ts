@@ -31,7 +31,9 @@ if (process.env.VERCEL !== "1") {
   start();
 } else {
   // On Vercel: init DB and tables without listening
-  connectDB().then(() => createTables());
+  connectDB()
+    .then(() => createTables())
+    .catch((err) => console.error("DB init failed on Vercel:", err));
 }
 
 export default app;

@@ -21,6 +21,6 @@ export async function createOrderItemTable() {
     console.log("✅ Order items table created or already exists");
   } catch (error) {
     console.error("❌ Failed To Create Order Items Table.", error);
-    process.exit(1);
+    throw error;
   }
 }

@@ -19,6 +19,6 @@ export async function createOrdersTable() {
     console.log("✅ Orders table created or already exists");
   } catch (error) {
     console.error("❌ Failed To Create Orders Table.", error);
-    process.exit(1);
+    throw error;
   }
 }

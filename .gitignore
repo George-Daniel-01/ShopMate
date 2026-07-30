@@ -36,3 +36,4 @@ project_explanation.*
 shopmate-postman-tests.*
 
 .vercel
+.env*

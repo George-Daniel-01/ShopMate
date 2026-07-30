@@ -4,11 +4,17 @@ dotenv.config({ path: "./config/config.env" });
 
 const { Pool } = pg;
 
+const dbUrl = process.env.DATABASE_URL;
+if (!dbUrl) {
+  console.error("DATABASE_URL is not set");
+  if (process.env.VERCEL !== "1") process.exit(1);
+}
+
 export const database = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  connectionString: dbUrl,
+  ssl: dbUrl?.includes("localhost")
+    ? false
+    : { rejectUnauthorized: false },
 });
 
 database.on("error", (err) => {
