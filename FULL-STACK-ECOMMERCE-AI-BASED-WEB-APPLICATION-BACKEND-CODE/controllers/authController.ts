@@ -184,7 +184,7 @@ export const makeAdmin = catchAsyncErrors(
     const { email } = req.body as { email: string };
     if (!email) return next(new ErrorHandler("Please provide email.", 400));
     const user = await database.query<IUser>(
-      "UPDATE users SET role = 'Admin' WHERE email = $1 RETURNING *",
+      "UPDATE users SET role = 'ADMIN' WHERE email = $1 RETURNING *",
       [email]
     );
     if (user.rows.length === 0)
