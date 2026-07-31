@@ -116,6 +116,35 @@ export default {
       },
     },
 
+    "/auth/make-admin": {
+      post: {
+        tags: ["Auth"],
+        summary: "Promote a user to Admin",
+        description: "Promotes an existing registered user to the ADMIN role. Admin only.",
+        security: [{ cookieAuth: [] }],
+        operationId: "makeAdmin",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["email"],
+                properties: { email: { type: "string", format: "email" } },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "User promoted to Admin" },
+          "400": { description: "Validation error" },
+          "401": { description: "Not authenticated" },
+          "403": { description: "Admin only" },
+          "404": { description: "User not found" },
+        },
+      },
+    },
+
     "/auth/login": {
       post: {
         tags: ["Auth"],
@@ -492,8 +521,8 @@ export default {
       post: {
         tags: ["Products"],
         summary: "AI-powered product search",
-        description: "Turns a natural-language query into a structured product filter (NVIDIA NIM with OpenRouter fallback).",
-        security: [{ cookieAuth: [] }],
+        description:
+          "Turns a natural-language prompt into a structured product filter (NVIDIA NIM with OpenRouter fallback). The AI extracts keywords, category and price bounds; the backend runs a PostgreSQL query with layered relaxation so results never silently come back empty. Public endpoint - no authentication required.",
         operationId: "aiSearch",
         requestBody: {
           required: true,
@@ -501,15 +530,38 @@ export default {
             "application/json": {
               schema: {
                 type: "object",
-                required: ["query"],
-                properties: { query: { type: "string", example: "wireless gaming mice under 50 dollars" } },
+                required: ["userPrompt"],
+                properties: {
+                  userPrompt: {
+                    type: "string",
+                    minLength: 1,
+                    description: "Natural-language search prompt, e.g. a product, category or budget",
+                    example: "wireless gaming mice under 50 dollars",
+                  },
+                },
               },
             },
           },
         },
         responses: {
-          "200": { description: "Filtered products matching the query" },
-          "500": { description: "AI provider unavailable" },
+          "200": {
+            description: "Matching products (may be relaxed when the strict query matches nothing)",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    totalProducts: { type: "integer", description: "Total matches before the 50-item cap" },
+                    products: { type: "array", items: { $ref: "#/components/schemas/Product" } },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Missing userPrompt in the request body" },
+          "503": { description: "AI search is not configured (no NVIDIA or OpenRouter API key)" },
+          "500": { description: "AI provider unavailable or returned an invalid response" },
         },
       },
     },

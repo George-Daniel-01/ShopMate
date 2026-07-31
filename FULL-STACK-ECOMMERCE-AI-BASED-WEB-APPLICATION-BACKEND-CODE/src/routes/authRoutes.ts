@@ -13,7 +13,7 @@ import {
   updatePassword,
   updateProfile,
 } from "../controllers/authController.js";
-import { isAuthenticated } from "../middlewares/authMiddleware.js";
+import { authorizedRoles, isAuthenticated } from "../middlewares/authMiddleware.js";
 import { validate } from "../middlewares/validate.js";
 import {
   forgotPasswordSchema,
@@ -30,7 +30,7 @@ const router = express.Router();
 
 router.post("/register", validate(registerSchema), register);
 router.post("/register-admin", validate(registerAdminSchema), registerAdmin);
-router.post("/make-admin", validate(makeAdminSchema), makeAdmin);
+router.post("/make-admin", isAuthenticated, authorizedRoles("ADMIN"), validate(makeAdminSchema), makeAdmin);
 router.post("/login", validate(loginSchema), login);
 router.get("/google", googleAuth);
 router.get("/google/callback", googleCallback);
