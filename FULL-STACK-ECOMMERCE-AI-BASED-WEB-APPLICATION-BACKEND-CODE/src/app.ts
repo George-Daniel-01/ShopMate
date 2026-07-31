@@ -62,6 +62,16 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(fileUpload({ useTempFiles: true, tempFileDir: "/tmp/", limits: { fileSize: 10 * 1024 * 1024 }, abortOnLimit: true }));
 
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    success: true,
+    service: "shopmate-api",
+    message: "ShopMate API is running.",
+    docs: "/api/v1/docs",
+    health: "/api/v1/health",
+  });
+});
+
 app.get("/api/v1/health", healthCheck);
 
 app.use("/api/v1/auth", authRouter);
