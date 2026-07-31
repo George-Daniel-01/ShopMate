@@ -3,6 +3,8 @@ import HeroSlider from "../components/Home/HeroSlider";
 import CategoryGrid from "../components/Home/CategoryGrid";
 import ProductSlider from "../components/Home/ProductSlider";
 import FeatureSection from "../components/Home/FeatureSection";
+import TestimonialsSection from "../components/Home/TestimonialsSection";
+import StatsBar from "../components/Home/StatsBar";
 import NewsletterSection from "../components/Home/NewsletterSection";
 import { useAppSelector, useAppDispatch } from "../store/hooks";
 import { fetchAllProducts } from "../store/slices/productSlice";
@@ -48,6 +50,10 @@ const Index = () => {
         )}
 
         <FeatureSection />
+        <TestimonialsSection />
+      </div>
+      <StatsBar />
+      <div className="container mx-auto px-4">
         <NewsletterSection />
       </div>
     </div>

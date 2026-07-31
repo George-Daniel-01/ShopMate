@@ -10,6 +10,8 @@ import Navbar from "./components/Layout/Navbar";
 import Sidebar from "./components/Layout/Sidebar";
 import SearchOverlay from "./components/Layout/SearchOverlay";
 import AISearchOverlay from "./components/Layout/AISearchOverlay";
+import QuickViewModal from "./components/Products/QuickViewModal";
+import BackToTop from "./components/Layout/BackToTop";
 import CartSidebar from "./components/Layout/CartSidebar";
 import ProfilePanel from "./components/Layout/ProfilePanel";
 import LoginModal from "./components/Layout/LoginModal";
@@ -21,6 +23,7 @@ import Index from "./pages/Home";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
+import Wishlist from "./pages/Wishlist";
 import Orders from "./pages/Orders";
 import Payment from "./pages/Payment";
 import About from "./pages/About";
@@ -54,6 +57,8 @@ const App = () => {
           <SearchOverlay />
           <AISearchOverlay />
           <CartSidebar />
+          <QuickViewModal />
+          <BackToTop />
           <ProfilePanel />
           <LoginModal />
           <RegisterModal />
@@ -65,6 +70,7 @@ const App = () => {
             <Route path="/products" element={<Products />} />
             <Route path="/product/:id" element={<ProductDetail />} />
             <Route path="/cart" element={<Cart />} />
+            <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/payment" element={<Payment />} />
             <Route path="/about" element={<About />} />

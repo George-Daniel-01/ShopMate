@@ -1,4 +1,4 @@
-﻿import { X, Plus, Minus, Trash2 } from "lucide-react";
+﻿import { X, Plus, Minus, Trash2, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
@@ -6,6 +6,8 @@ import {
   updateCartQuantity,
 } from "../../store/slices/cartSlice";
 import { toggleCart } from "../../store/slices/popupSlice";
+
+const FREE_SHIPPING_THRESHOLD = 100;
 
 const CartSidebar = () => {
   const dispatch = useAppDispatch();
@@ -28,6 +30,9 @@ const CartSidebar = () => {
   if (!isCartOpen) return null;
 
   const total = cart?.reduce((sum, item) => sum + item.product.price * item.quantity, 0) || 0;
+  const itemCount = cart?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+  const shippingProgress = Math.min(total / FREE_SHIPPING_THRESHOLD, 1);
+  const remainingForFreeShipping = Math.max(FREE_SHIPPING_THRESHOLD - total, 0);
 
   return (
     <>
@@ -37,7 +42,10 @@ const CartSidebar = () => {
       />
       <div className="fixed right-0 top-0 h-full w-96 z-50 glass-panel animate-slide-in-right overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-[hsla(var(--glass-border))]">
-          <h2 className="text-xl font-semibold text-primary">Shopping Cart</h2>
+          <div>
+            <h2 className="text-xl font-semibold text-primary">Shopping Cart</h2>
+            <p className="text-sm text-muted-foreground">{itemCount} item{itemCount !== 1 && "s"}</p>
+          </div>
           <button
             onClick={() => dispatch(toggleCart())}
             className="p-2 rounded-lg glass-card hover:glow-on-hover animate-smooth"
@@ -51,7 +59,7 @@ const CartSidebar = () => {
             <div className="text-center py-12">
               <p className="text-muted-foreground">Your cart is empty.</p>
               <Link
-                to="/products"  // Fixed path
+                to="/products"
                 onClick={() => dispatch(toggleCart())}
                 className="inline-block mt-4 px-6 py-2 gradient-primary text-primary-foreground rounded-lg hover:glow-on-hover animate-smooth"
               >
@@ -60,6 +68,29 @@ const CartSidebar = () => {
             </div>
           ) : (
             <>
+              {/* FREE SHIPPING PROGRESS */}
+              <div className="mb-6 p-4 bg-secondary/50 border border-border rounded-md">
+                <div className="flex items-center gap-2 mb-2">
+                  <Truck className="w-4 h-4 text-primary" />
+                  {remainingForFreeShipping > 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Add <span className="font-semibold text-foreground">${remainingForFreeShipping.toFixed(2)}</span> more for{" "}
+                      <span className="font-semibold text-primary">FREE shipping</span>
+                    </p>
+                  ) : (
+                    <p className="text-xs font-semibold text-green-600 dark:text-green-400">
+                      You've unlocked FREE shipping!
+                    </p>
+                  )}
+                </div>
+                <div className="h-2 bg-border rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-500"
+                    style={{ width: `${shippingProgress * 100}%` }}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-4 mb-6">
                 {cart.map((item) => (
                   <div key={item.product.id} className="glass-card p-4">

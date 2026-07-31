@@ -92,6 +92,10 @@ export interface CartState {
   cart: CartItem[];
 }
 
+export interface WishlistState {
+  wishlist: Product[];
+}
+
 export interface PopupState {
   isAuthPopupOpen: boolean;
   authPopupView: "login" | "register" | "forgotPassword" | "resetPassword";
@@ -99,6 +103,7 @@ export interface PopupState {
   isSearchBarOpen: boolean;
   isCartOpen: boolean;
   isAIPopupOpen: boolean;
+  quickViewProduct: Product | null;
 }
 
 export interface ProductState {
@@ -130,4 +135,5 @@ export interface RootState {
   cart: CartState;
   product: ProductState;
   order: OrderState;
+  wishlist: WishlistState;
 }

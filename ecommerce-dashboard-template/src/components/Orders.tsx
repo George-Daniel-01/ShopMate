@@ -1,8 +1,37 @@
 ﻿import { useEffect, useState } from "react";
+import { Download, Search } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import Header from "./Header";
 import { deleteOrder, fetchAllOrders, updateOrderStatus } from "../store/slices/orderSlice";
 import type { Order, OrderItem } from "../types/index";
+
+const exportOrdersCSV = (orders: Order[]) => {
+  const header = "Order ID,Status,Customer,Email,Total,Placed At,Items";
+  const rows = orders.map((o) => {
+    const items = (o.order_items || [])
+      .map((it) => `${it.title} x${it.quantity}`)
+      .join("; ");
+    return [
+      `"${o.id}"`,
+      `"${o.order_status}"`,
+      `"${o.shipping_info?.full_name || ""}"`,
+      `"${o.shipping_info?.phone || ""}"`,
+      o.total_price,
+      `"${new Date(o.created_at).toLocaleString()}"`,
+      `"${items.replace(/"/g, '""')}"`,
+    ].join(",");
+  });
+  const csv = [header, ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 const Orders = () => {
   const statusFilters = ["All", "Processing", "Shipped", "Delivered", "Cancelled"];
@@ -12,6 +41,7 @@ const Orders = () => {
   const { user } = useAppSelector((state) => state.auth);
   const [selectedStatus, setSelectedStatus] = useState<Record<string, string>>({});
   const [filterByStatus, setFilterByStatus] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
 
@@ -22,7 +52,17 @@ const Orders = () => {
     dispatch(updateOrderStatus({ orderId, status: newStatus }));
   };
 
-  const filteredOrders = filterByStatus === "All" ? orders : orders?.filter((o: Order) => o.order_status === filterByStatus);
+  const filteredOrders = (orders || []).filter((o: Order) => {
+    if (filterByStatus !== "All" && o.order_status !== filterByStatus) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      o.id.toLowerCase().includes(q) ||
+      (o.shipping_info?.full_name || "").toLowerCase().includes(q) ||
+      (o.shipping_info?.phone || "").includes(q) ||
+      (o.order_items || []).some((it) => it.title.toLowerCase().includes(q))
+    );
+  });
   const confirmDelete = () => {
     if (deleteConfirm.id) dispatch(deleteOrder(deleteConfirm.id));
     setDeleteConfirm({ open: false, id: null });
@@ -39,10 +79,29 @@ const Orders = () => {
         <div className="w-40 h-40 mx-auto border-2 border-white border-t-transparent rounded-full animate-spin" />
       ) : (
         <>
-          <div className="flex justify-between items-center p-6">
-            <select value={filterByStatus} onChange={(e) => setFilterByStatus(e.target.value)} className="border p-2 rounded mb-2">
-              {statusFilters.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+          <div className="flex flex-wrap justify-between items-center gap-3 p-6">
+            <div className="flex flex-wrap gap-3 items-center">
+              <select value={filterByStatus} onChange={(e) => setFilterByStatus(e.target.value)} className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white">
+                {statusFilters.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search orders, customers, items..."
+                  className="border border-gray-300 rounded-md pl-9 pr-3 py-2 text-sm w-64 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
+                />
+              </div>
+            </div>
+            <button
+              onClick={() => exportOrdersCSV(filteredOrders)}
+              disabled={filteredOrders.length === 0}
+              className="flex items-center gap-2 bg-[#111827] hover:bg-gray-800 disabled:bg-gray-300 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              <Download className="w-4 h-4" /> Export CSV ({filteredOrders.length})
+            </button>
           </div>
           {filteredOrders.length === 0 ? <p className="p-10">No orders found.</p> : (
             <>

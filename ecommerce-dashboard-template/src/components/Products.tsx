@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from "react";
-import { LoaderCircle, Plus } from "lucide-react";
+import { LoaderCircle, Plus, Search, AlertTriangle } from "lucide-react";
 import CreateProductModal from "../modals/CreateProductModal";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import Header from "./Header";
@@ -15,9 +15,10 @@ import type { Product } from "../types/index";
 
 const Products = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null); // ✅ track which row is being deleted
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [maxPage, setMaxPage] = useState<number | null>(null);
   const [page, setPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
   const dispatch = useAppDispatch();
 
   const {
@@ -55,15 +56,41 @@ const Products = () => {
     dispatch(deleteProduct(product.id, page));
   };
 
+  const lowStockCount = products.filter((p) => p.stock > 0 && p.stock <= 5).length;
+  const visibleProducts = searchQuery.trim()
+    ? products.filter((p) =>
+        `${p.name} ${p.category}`.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : products;
+
   return (
     <>
       <main className="p-[10px] pl-[10px] md:pl-[17rem] w-full">
         <div className="flex-1 md:p-6">
           <Header />
-          <h1 className="text-2xl font-bold">All Products</h1>
-          <p className="text-sm text-gray-600 mb-6">
-            Manage all your website products.
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <div>
+              <h1 className="text-2xl font-bold">All Products</h1>
+              <p className="text-sm text-gray-600">
+                Manage all your website products.
+                {lowStockCount > 0 && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-amber-600 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5" /> {lowStockCount} low in stock
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search products..."
+                className="border border-gray-300 rounded-md pl-9 pr-3 py-2 text-sm w-64 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
+              />
+            </div>
+          </div>
           <div className="p-4 sm:p-8 bg-gray-50 min-h-screen">
             <div
               className={`overflow-x-auto rounded-lg ${
@@ -91,7 +118,7 @@ const Products = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {products.map((product: Product, index: number) => (
+                    {visibleProducts.map((product: Product, index: number) => (
                       <tr
                         key={index}
                         className="border-t hover:bg-gray-50 cursor-pointer"
@@ -112,7 +139,15 @@ const Products = () => {
                         <td className="px-3 py-4">
                           ${Number(product.price).toFixed(2)}
                         </td>
-                        <td className="px-3 py-4">{product.stock}</td>
+                        <td className="px-3 py-4">
+                          {product.stock === 0 ? (
+                            <span className="inline-block bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 rounded">Out of stock</span>
+                          ) : product.stock <= 5 ? (
+                            <span className="inline-block bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-1 rounded">{product.stock} left</span>
+                          ) : (
+                            product.stock
+                          )}
+                        </td>
                         <td className="px-3 py-4 text-yellow-500">
                           {product.ratings}
                         </td>

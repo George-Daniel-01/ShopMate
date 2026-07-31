@@ -1,4 +1,5 @@
-﻿import { Menu, User, ShoppingCart, Sun, Moon, Search } from "lucide-react";
+﻿import { Menu, User, ShoppingCart, Sun, Moon, Search, Heart } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
@@ -14,6 +15,7 @@ const Navbar = () => {
   const dispatch = useAppDispatch();
 
   const { cart } = useAppSelector((state) => state.cart);
+  const { wishlist } = useAppSelector((state) => state.wishlist);
   let cartItemsCount = 0;
   if (cart) {
     cartItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
@@ -34,7 +36,9 @@ const Navbar = () => {
 
             {/* CENTER LOGO */}
             <div className="flex-1 flex justify-center">
-              <h1 className="text-2xl font-bold text-primary">ShopMate</h1>
+              <Link to="/">
+                <h1 className="text-2xl font-bold text-primary">ShopMate</h1>
+              </Link>
             </div>
 
             {/* RIGHT SIDE ICONS */}
@@ -58,6 +62,20 @@ const Navbar = () => {
               >
                 <Search className="w-5 h-5 text-foreground" />
               </button>
+
+              {/* WISHLIST */}
+              <Link
+                to="/wishlist"
+                className="relative p-2 rounded-lg hover:bg-secondary transition-colors"
+                title="Wishlist"
+              >
+                <Heart className="w-5 h-5 text-foreground" />
+                {wishlist.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {wishlist.length}
+                  </span>
+                )}
+              </Link>
 
               {/* USER PROFILE */}
               <button

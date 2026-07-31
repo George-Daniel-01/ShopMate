@@ -1,4 +1,5 @@
 ﻿import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { toast } from "react-toastify";
 import type { CartItem, CartState, Product } from "../../types/index";
 
 const cartSlice = createSlice({
@@ -13,10 +14,13 @@ const cartSlice = createSlice({
       } else {
         state.cart.push({ product, quantity });
       }
+      toast.success(`${product.name} added to cart`);
     },
     removeFromCart(state, action: PayloadAction<string | { id: string }>) {
       const id = typeof action.payload === "string" ? action.payload : action.payload.id;
+      const item = state.cart.find((item) => item.product.id === id);
       state.cart = state.cart.filter((item) => item.product.id !== id);
+      if (item) toast.info(`${item.product.name} removed from cart`);
     },
     updateCartQuantity(state, action: PayloadAction<{ id: string; quantity: number }>) {
       const { id, quantity } = action.payload;
@@ -28,6 +32,7 @@ const cartSlice = createSlice({
     },
     clearCart(state) {
       state.cart = [];
+      toast.info("Cart cleared");
     },
   },
 });
