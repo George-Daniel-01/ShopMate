@@ -1,0 +1,49 @@
+name: Keep-Alive & Outage Alert
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend health
+        id: health
+        run: |
+          code=$(curl -sS -o /tmp/health.json -w "%{http_code}" --max-time 60 https://shop-mate-backend.vercel.app/api/v1/health || echo "000")
+          echo "health_http_code=$code" >> "$GITHUB_OUTPUT"
+          echo "--- health response ---"
+          cat /tmp/health.json
+        continue-on-error: true
+
+      - name: Ping storefront + dashboard
+        id: sites
+        run: |
+          sf=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 30 https://shop-mate-six-azure.vercel.app/ || echo "000")
+          db=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 30 https://shop-dashboard-tan.vercel.app/ || echo "000")
+          echo "storefront=$sf dashboard=$db" >> "$GITHUB_OUTPUT"
+          echo "storefront=$sf dashboard=$db"
+        continue-on-error: true
+
+      - name: Open or update outage issue
+        if: steps.health.outcome == 'failure' || steps.sites.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="⚠️ Outage detected: ShopMate services down"
+          body="Automated check found the site is down.
+          Backend health: HTTP ${{ steps.health.outputs.health_http_code }}
+          Storefront: ${{ steps.sites.outputs.storefront }}
+          Dashboard: ${{ steps.sites.outputs.dashboard }}
+
+          First run: **curl https://shop-mate-backend.vercel.app/api/v1/health** — it self-heals the database schema.
+          If it stays down, read OPERATIONS.md (incident playbook) at https://github.com/George-Daniel-01/ShopMate/blob/main/OPERATIONS.md
+          "
+          existing=$(gh issue list --repo George-Daniel-01/ShopMate --search "Outage detected" --state open --json number -q '.[0].number' || true)
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo George-Daniel-01/ShopMate --body "Still down at $(date -u +'%Y-%m-%d %H:%M UTC'). Health HTTP: ${{ steps.health.outputs.health_http_code }}"
+          else
+            gh issue create --repo George-Daniel-01/ShopMate --title "$title" --body "$body"
+          fi

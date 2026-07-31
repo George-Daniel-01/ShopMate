@@ -5,3 +5,5 @@ uploads
 config/config.env
 
 dist/
+.vercel
+.env*
