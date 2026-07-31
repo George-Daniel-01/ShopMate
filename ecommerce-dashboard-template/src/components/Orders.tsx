@@ -91,7 +91,7 @@ const Orders = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search orders, customers, items..."
-                  className="border border-gray-300 rounded-md pl-9 pr-3 py-2 text-sm w-64 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
+                  className="border border-gray-300 rounded-md pl-9 pr-3 py-2 text-sm w-full sm:w-64 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
                 />
               </div>
             </div>
@@ -130,8 +130,8 @@ const Orders = () => {
                   <div className="mt-4">
                     <h4 className="font-semibold text-lg mb-2">Ordered Items</h4>
                     {Array.isArray(order.order_items) && order.order_items.map((item: OrderItem) => (
-                      <div key={item.order_item_id} className="flex items-center gap-4 mb-2 border-b pb-2">
-                        {item.image && <img src={item.image} alt={item.title} className="w-16 h-16 object-cover cursor-pointer" onClick={() => setPreviewImage(item.image)} />}
+                      <div key={item.order_item_id} className="flex flex-wrap items-center gap-3 mb-2 border-b pb-2">
+                        {item.image && <img src={item.image} alt={item.title} className="w-12 h-12 sm:w-16 sm:h-16 object-cover cursor-pointer shrink-0" onClick={() => setPreviewImage(item.image)} />}
                         <div>
                           <p className="font-semibold">{item.title}</p>
                           <p><strong>Qty:</strong> {item.quantity} | <strong>Price:</strong> ${item.price} | <strong>Total:</strong> ${item.quantity * item.price}</p>

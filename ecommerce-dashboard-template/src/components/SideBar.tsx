@@ -23,7 +23,14 @@ const SideBar = () => {
   if (!isAuthenticated) return <Navigate to="/login" />;
 
   return (
-    <aside className={`${isNavbarOpened ? "left-[10px]" : "-left-full"} fixed w-64 h-[97.5%] rounded-lg bg-white border border-gray-200 z-10 mt-[10px] transition-all duration-300 shadow-sm p-4 space-y-4 flex flex-col justify-between md:left-[10px]`}>
+    <>
+      {isNavbarOpened && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => dispatch(toggleNavbar())}
+        />
+      )}
+      <aside className={`${isNavbarOpened ? "left-[10px]" : "-left-full"} fixed w-64 max-w-[85vw] h-[97.5%] rounded-lg bg-white border border-gray-200 z-40 mt-[10px] transition-all duration-300 shadow-sm p-4 space-y-4 flex flex-col justify-between md:left-[10px]`}>
       <nav className="space-y-2">
         <div className="flex flex-col gap-2 py-2">
           <h2 className="flex items-center justify-between text-xl font-bold text-gray-900">
@@ -43,6 +50,7 @@ const SideBar = () => {
         <LogOut /> Logout
       </button>
     </aside>
+    </>
   );
 };
 

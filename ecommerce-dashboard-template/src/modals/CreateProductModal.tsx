@@ -58,7 +58,7 @@ const CreateProductModal = () => {
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center p-4" onPaste={handlePaste}>
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm w-full max-w-2xl p-6 relative">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
         <button onClick={() => { if (!actionLoading) dispatch(toggleCreateProductModal()); }} className="absolute top-4 right-4 text-gray-600 hover:text-red-500 text-xl">&times;</button>
         <h2 className="text-2xl font-bold mb-4 text-center">Create New Product</h2>
         <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={handleSubmit}>
