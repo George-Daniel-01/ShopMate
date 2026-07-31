@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import Dashboard from "./components/Dashboard";
 import Orders from "./components/Orders";
 import Products from "./components/Products";
+import Categories from "./components/Categories";
 import Profile from "./components/Profile";
 import Users from "./components/Users";
 import { getUser } from "./store/slices/authSlice";
@@ -35,6 +36,7 @@ function App() {
       case "Users": return <Users />;
       case "Profile": return <Profile />;
       case "Products": return <Products />;
+      case "Categories": return <Categories />;
       default: return <Dashboard />;
     }
   };

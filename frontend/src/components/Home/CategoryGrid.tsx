@@ -1,6 +1,41 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { categories } from "../../data/products";
+import { axiosInstance } from "../../lib/axios";
+import { categories as staticCategories } from "../../data/products";
+
+interface ApiCategory {
+  id: string;
+  name: string;
+  image: { url: string } | null;
+}
+
 const CategoryGrid = () => {
+  const [categories, setCategories] = useState(staticCategories);
+
+  useEffect(() => {
+    let mounted = true;
+    axiosInstance
+      .get("/category")
+      .then((res) => {
+        const apiCategories: ApiCategory[] = res.data?.categories ?? [];
+        if (mounted && apiCategories.length > 0) {
+          setCategories(
+            apiCategories.map((c) => ({
+              id: c.id,
+              name: c.name,
+              image: c.image?.url || staticCategories[0]?.image,
+            }))
+          );
+        }
+      })
+      .catch(() => {
+        // keep static fallback
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <section className="py-16">
       <div className="text-center mb-12">

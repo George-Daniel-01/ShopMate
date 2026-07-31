@@ -1,19 +1,27 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { createNewProduct } from "../store/slices/productsSlice";
+import { fetchCategories } from "../store/slices/categorySlice";
 import { toggleCreateProductModal } from "../store/slices/extraSlice";
 import toast from "react-hot-toast";
 import { LoaderCircle } from "lucide-react";
 
-const categoryOptions = ["Electronics", "Fashion", "Home & Garden", "Sports", "Books", "Beauty", "Automotive", "Kids & Baby"];
+const fallbackCategories = ["Electronics", "Fashion", "Home & Garden", "Sports", "Books", "Beauty", "Automotive", "Kids & Baby"];
 
 const CreateProductModal = () => {
   const { actionLoading } = useAppSelector((state) => state.product);
+  const { categories } = useAppSelector((state) => state.category);
   const dispatch = useAppDispatch();
   const [formData, setFormData] = useState({
     name: "", description: "", price: "", category: "Electronics", stock: "", images: [] as File[]
   });
   const [previews, setPreviews] = useState<string[]>([]);
+
+  useEffect(() => {
+    dispatch(fetchCategories());
+  }, [dispatch]);
+
+  const categoryOptions = categories.length > 0 ? categories.map((c) => c.name) : fallbackCategories;
 
   const addImages = (files: File[]) => {
     setFormData((prev) => ({ ...prev, images: [...prev.images, ...files] }));
@@ -63,7 +71,7 @@ const CreateProductModal = () => {
           <div className="col-span-1 md:col-span-2">
             <label className="block text-sm text-gray-600 mb-1">Product Images</label>
             <div className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center hover:border-gray-400 transition-colors">
-              <p className="text-gray-500 text-sm mb-2">Paste (Ctrl+V) � Drag & Drop � or Choose Files</p>
+              <p className="text-gray-500 text-sm mb-2">Paste (Ctrl+V) - Drag & Drop - or Choose Files</p>
               <input type="file" multiple accept="image/*" onChange={(e) => addImages(Array.from(e.target.files ?? []))} className="hidden" id="fileInput" />
               <label htmlFor="fileInput" className="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded cursor-pointer text-sm">Choose Files</label>
             </div>

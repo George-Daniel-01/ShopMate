@@ -27,6 +27,14 @@ export interface IProductImage {
   public_id: string;
 }
 
+export interface ICategory {
+  id: string;
+  name: string;
+  image: IProductImage | null;
+  created_at: Date;
+  product_count?: number;
+}
+
 export interface IProduct {
   id: string;
   name: string;

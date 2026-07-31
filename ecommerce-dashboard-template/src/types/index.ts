@@ -3,6 +3,14 @@
   public_id: string;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  image: ProductImage | null;
+  created_at: string;
+  product_count?: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -116,6 +124,8 @@ export interface ExtraState {
   isViewProductModalOpened: boolean;
   isCreateProductModalOpened: boolean;
   isUpdateProductModalOpened: boolean;
+  isCreateCategoryModalOpened: boolean;
+  isUpdateCategoryModalOpened: boolean;
 }
 
 export interface ProductState {
@@ -123,6 +133,12 @@ export interface ProductState {
   actionLoading: boolean;
   products: Product[];
   totalProducts: number;
+}
+
+export interface CategoryState {
+  loading: boolean;
+  actionLoading: boolean;
+  categories: Category[];
 }
 
 export interface OrderState {
@@ -136,5 +152,6 @@ export interface RootState {
   admin: AdminState;
   extra: ExtraState;
   product: ProductState;
+  category: CategoryState;
   order: OrderState;
 }

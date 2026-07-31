@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import { LayoutDashboard, ListOrdered, Package, Users, User, LogOut, MoveLeft } from "lucide-react";
+import { LayoutDashboard, ListOrdered, Package, Tags, Users, User, LogOut, MoveLeft } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { logout } from "../store/slices/authSlice";
 import { toggleComponent, toggleNavbar } from "../store/slices/extraSlice";
@@ -11,6 +11,7 @@ const SideBar = () => {
     { item: <LayoutDashboard />, title: "Dashboard" },
     { item: <ListOrdered />, title: "Orders" },
     { item: <Package />, title: "Products" },
+    { item: <Tags />, title: "Categories" },
     { item: <Users />, title: "Users" },
     { item: <User />, title: "Profile" },
   ];
