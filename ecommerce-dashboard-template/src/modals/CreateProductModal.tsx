@@ -50,7 +50,7 @@ const CreateProductModal = () => {
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center p-4" onPaste={handlePaste}>
-      <div className="bg-white rounded-xl w-full max-w-2xl p-6 relative">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm w-full max-w-2xl p-6 relative">
         <button onClick={() => { if (!actionLoading) dispatch(toggleCreateProductModal()); }} className="absolute top-4 right-4 text-gray-600 hover:text-red-500 text-xl">&times;</button>
         <h2 className="text-2xl font-bold mb-4 text-center">Create New Product</h2>
         <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={handleSubmit}>
@@ -62,7 +62,7 @@ const CreateProductModal = () => {
           <input type="number" placeholder="Stock *" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="border px-4 py-2 rounded" min="0" required />
           <div className="col-span-1 md:col-span-2">
             <label className="block text-sm text-gray-600 mb-1">Product Images</label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors">
+            <div className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center hover:border-gray-400 transition-colors">
               <p className="text-gray-500 text-sm mb-2">Paste (Ctrl+V) � Drag & Drop � or Choose Files</p>
               <input type="file" multiple accept="image/*" onChange={(e) => addImages(Array.from(e.target.files ?? []))} className="hidden" id="fileInput" />
               <label htmlFor="fileInput" className="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded cursor-pointer text-sm">Choose Files</label>
@@ -79,7 +79,7 @@ const CreateProductModal = () => {
             )}
           </div>
           <textarea placeholder="Description *" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="border px-4 py-2 rounded col-span-1 md:col-span-2" rows={4} required />
-          <button type="submit" disabled={actionLoading} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white py-2 px-6 rounded col-span-1 md:col-span-2">
+          <button type="submit" disabled={actionLoading} className="flex items-center justify-center gap-2 bg-[#111827] hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-2 px-6 rounded-md col-span-1 md:col-span-2">
             {actionLoading ? <><LoaderCircle className="w-6 h-6 animate-spin" /> Creating...</> : "Add New Product"}
           </button>
         </form>

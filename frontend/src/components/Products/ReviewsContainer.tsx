@@ -63,7 +63,7 @@ const ReviewsContainer = ({ product, productReviews }: { product: import("../../
           <button
             type="submit"
             disabled={isPostingReview}
-            className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold animate-smooth disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2 rounded-md bg-[#111827] hover:bg-gray-800 text-white font-semibold animate-smooth disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isPostingReview ? "Submitting..." : "Submit Review"}
           </button>

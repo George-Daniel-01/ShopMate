@@ -47,7 +47,7 @@ const Profile = () => {
           <div>
             <p className="text-xl font-medium">Name: {user?.name}</p>
             <p className="text-md text-gray-600">Email: {user?.email}</p>
-            <p className="text-sm text-blue-500">Role: {user?.role}</p>
+            <p className="text-sm text-gray-500">Role: {user?.role}</p>
           </div>
         </div>
         <div className="bg-gray-100 p-6 rounded-2xl shadow-md mb-10">
@@ -57,7 +57,7 @@ const Profile = () => {
             <input type="email" name="email" value={editData.email} onChange={(e) => setEditData({ ...editData, email: e.target.value })} className="p-2 border rounded-md" placeholder="Your Email" />
             <input type="file" name="avatar" onChange={handleAvatarChange} className="p-2 border rounded-md col-span-1 md:col-span-2" />
           </div>
-          <button onClick={updateProfile} className="flex justify-center items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 mt-4" disabled={loading}>
+          <button onClick={updateProfile} className="flex justify-center items-center gap-2 rounded-md bg-[#111827] hover:bg-gray-800 text-white font-semibold py-2.5 px-6 mt-4 text-sm" disabled={loading}>
             {loading && updatingSection === "Profile" ? (<><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>Updating...</span></>) : "Update Profile"}
           </button>
         </div>
@@ -68,7 +68,7 @@ const Profile = () => {
             <input type="password" name="newPassword" value={passwordData.newPassword} onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })} className="p-2 border rounded-md" placeholder="New Password" />
             <input type="password" name="confirmNewPassword" value={passwordData.confirmNewPassword} onChange={(e) => setPasswordData({ ...passwordData, confirmNewPassword: e.target.value })} className="p-2 border rounded-md" placeholder="Confirm New Password" />
           </div>
-          <button onClick={updatePassword} className="flex justify-center items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 mt-4" disabled={loading}>
+          <button onClick={updatePassword} className="flex justify-center items-center gap-2 rounded-md bg-[#111827] hover:bg-gray-800 text-white font-semibold py-2.5 px-6 mt-4 text-sm" disabled={loading}>
             {loading && updatingSection === "Password" ? (<><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>Updating...</span></>) : "Update Password"}
           </button>
         </div>

@@ -214,7 +214,7 @@ const Products = () => {
                 </div>
                 <button
                   onClick={() => dispatch(toggleAIModal())}
-                  className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-primary to-purple-600 text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium whitespace-nowrap"
+                  className="flex items-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity text-sm font-medium whitespace-nowrap"
                 >
                   <Sparkles className="w-4 h-4" />
                   <span className="hidden sm:inline">AI Search</span>

@@ -79,7 +79,7 @@ const Products = () => {
                 <div className="w-40 h-40 mx-auto border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : products && products.length > 0 ? (
                 <table className="min-w-full bg-white border border-gray-200">
-                  <thead className="bg-blue-100 text-gray-700">
+                  <thead className="bg-gray-100 text-gray-700">
                     <tr>
                       <th className="py-3 px-4 text-left">Image</th>
                       <th className="py-3 px-4 text-left">Title</th>
@@ -119,7 +119,7 @@ const Products = () => {
                         <td className="px-4 py-3 flex gap-2">
                           {/* Update button — opens modal, no loading state needed here */}
                           <button
-                            className="text-white rounded-md cursor-pointer px-3 py-2 font-semibold bg-blue-500 hover:bg-blue-600"
+                            className="text-white rounded-md cursor-pointer px-3 py-2 font-semibold bg-[#111827] hover:bg-gray-800"
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedProduct(product);
@@ -157,7 +157,7 @@ const Products = () => {
                 <button
                   onClick={() => setPage((p) => Math.max(p - 1, 1))}
                   disabled={page === 1}
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded disabled:opacity-50"
+                  className="px-4 py-2 bg-[#111827] hover:bg-gray-800 text-white rounded disabled:opacity-50"
                 >
                   Previous
                 </button>
@@ -165,7 +165,7 @@ const Products = () => {
                 <button
                   onClick={() => setPage((p) => p + 1)}
                   disabled={maxPage === page}
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded disabled:opacity-50"
+                  className="px-4 py-2 bg-[#111827] hover:bg-gray-800 text-white rounded disabled:opacity-50"
                 >
                   Next
                 </button>
@@ -176,7 +176,7 @@ const Products = () => {
 
         <button
           onClick={() => dispatch(toggleCreateProductModal())}
-          className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg z-50"
+          className="fixed bottom-6 right-6 bg-[#111827] hover:bg-gray-800 text-white p-4 rounded-full shadow-lg z-50"
           title="Create New Product"
         >
           <Plus size={20} />

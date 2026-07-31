@@ -22,18 +22,18 @@ const SideBar = () => {
   if (!isAuthenticated) return <Navigate to="/login" />;
 
   return (
-    <aside className={`${isNavbarOpened ? "left-[10px]" : "-left-full"} fixed w-64 h-[97.5%] rounded-xl bg-white z-10 mt-[10px] transition-all duration-300 shadow-lg p-4 space-y-4 flex flex-col justify-between md:left-[10px]`}>
+    <aside className={`${isNavbarOpened ? "left-[10px]" : "-left-full"} fixed w-64 h-[97.5%] rounded-lg bg-white border border-gray-200 z-10 mt-[10px] transition-all duration-300 shadow-sm p-4 space-y-4 flex flex-col justify-between md:left-[10px]`}>
       <nav className="space-y-2">
         <div className="flex flex-col gap-2 py-2">
-          <h2 className="flex items-center justify-between text-xl font-bold">
+          <h2 className="flex items-center justify-between text-xl font-bold text-gray-900">
             <span>Admin Panel</span>
             <MoveLeft className="block md:hidden" onClick={() => dispatch(toggleNavbar())} />
           </h2>
-          <hr />
+          <hr className="border-gray-200" />
         </div>
         {links.map((item, index) => (
           <button key={index} onClick={() => { setActiveLink(index); dispatch(toggleComponent(item.title)); }}
-            className={`${activeLink === index && "bg-dark-gradient text-white"} hover:bg-gray-200 w-full transition-all duration-300 rounded-md cursor-pointer px-3 py-2 flex items-center gap-2`}>
+            className={`${activeLink === index ? "bg-[#111827] text-white" : "text-gray-700 hover:bg-gray-100"} w-full transition-all duration-300 rounded-md cursor-pointer px-3 py-2 flex items-center gap-2`}>
             {item.item} {item.title}
           </button>
         ))}

@@ -53,7 +53,7 @@ const UpdateProductModal = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center p-4">
-      <div className="bg-white rounded-xl w-full max-w-2xl p-6 relative">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm w-full max-w-2xl p-6 relative">
         <button
           onClick={() => dispatch(toggleUpdateProductModal())}
           className="absolute top-4 right-4 text-gray-600 hover:text-red-500 text-xl"

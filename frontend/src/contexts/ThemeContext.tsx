@@ -16,9 +16,9 @@ export const useTheme = (): ThemeContextType => {
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setTheme] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("theme") || "dark";
+      return localStorage.getItem("theme") || "light";
     }
-    return "dark";
+    return "light";
   });
 
   const toggleTheme = () => {

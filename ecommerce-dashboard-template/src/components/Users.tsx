@@ -28,7 +28,7 @@ const Users = () => {
             <div className="w-40 h-40 mx-auto border-2 border-white border-t-transparent rounded-full animate-spin" />
           ) : users && users.length > 0 ? (
             <table className="min-w-full bg-white border border-gray-200">
-              <thead className="bg-blue-100 text-gray-700">
+              <thead className="bg-gray-100 text-gray-700">
                 <tr>
                   <th className="py-3 px-4 text-left">Avatar</th>
                   <th className="py-3 px-4 text-left">Name</th>
@@ -55,9 +55,9 @@ const Users = () => {
         </div>
         {!loading && users.length > 0 && (
           <div className="flex justify-center mt-6 gap-4">
-            <button onClick={() => setPage((p) => Math.max(p - 1, 1))} disabled={page === 1} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded disabled:opacity-50">Previous</button>
+            <button onClick={() => setPage((p) => Math.max(p - 1, 1))} disabled={page === 1} className="px-4 py-2 bg-[#111827] hover:bg-gray-800 text-white rounded disabled:opacity-50">Previous</button>
             <span className="px-4 py-2 text-gray-700">Page {page}</span>
-            <button onClick={() => setPage((p) => p + 1)} disabled={maxPage === page} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded disabled:opacity-50">Next</button>
+            <button onClick={() => setPage((p) => p + 1)} disabled={maxPage === page} className="px-4 py-2 bg-[#111827] hover:bg-gray-800 text-white rounded disabled:opacity-50">Next</button>
           </div>
         )}
       </div>
