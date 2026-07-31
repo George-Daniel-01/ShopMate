@@ -41,7 +41,7 @@ ShopMate/
 - Product detail pages with image gallery and customer reviews
 - Shopping cart with quantity management
 - Multi-step checkout with Stripe payment integration
-- User authentication: register, login, forgot/reset password
+- User authentication: register, login, forgot/reset password, and **“Continue with Google”** (OAuth 2.0 — one click, no password)
 - Profile management: update name, email, avatar, and password
 - Order history with real-time status tracking (auto-refreshes every 30s)
 - Dark/light theme toggle
@@ -121,6 +121,11 @@ CLOUDINARY_CLIENT_SECRET=your_api_secret
 
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Google OAuth (“Continue with Google”)
+GOOGLE_CLIENT_ID=your_google_oauth_client_id
+GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
+GOOGLE_REDIRECT_URI=https://shop-mate-backend.vercel.app/api/v1/auth/google/callback
 
 NVIDIA_API_KEY=your_nvidia_nim_api_key
 OPENROUTER_API_KEY=your_openrouter_api_key
@@ -217,6 +222,8 @@ Content-Type: application/json
 | POST | `/register` | — | Register a new user |
 | POST | `/register-admin` | — | Register an admin (requires secret key) |
 | POST | `/login` | — | Login |
+| GET | `/google` | — | Start Google OAuth (redirects to Google consent) |
+| GET | `/google/callback` | — | Google OAuth callback (sets JWT cookie, redirects to storefront) |
 | GET | `/me` | ✅ | Get current user |
 | GET | `/logout` | ✅ | Logout |
 | POST | `/password/forgot` | — | Request password reset email |
@@ -327,6 +334,7 @@ https://your-backend.vercel.app/api/v1/payment/webhook
 - **Currency**: Prices are stored internally as numeric values. It is up to the frontend to display the appropriate currency symbol.
 - **Reviews**: Users can only review products from orders with status `Delivered`.
 - **Stock**: Automatically decremented when a Stripe `payment_intent.succeeded` webhook is received. Products can be created/updated with `stock: 0` (out of stock).
+- **Google Sign-In**: users authenticate with one click via `/api/v1/auth/google`. Existing accounts are linked by email; new users get a generated password (password login stays disabled for them). The OAuth client must be created in [Google Cloud Console](https://console.cloud.google.com/apis/credentials) with the authorized redirect URI set to `GOOGLE_REDIRECT_URI`.
 - **AI Search**: Extracts search parameters from natural language via the same NVIDIA NIM API used by the GenericAgent stack (Nemotron 3 Ultra 550B), with OpenRouter GPT-4o-mini as automatic fallback, then filters the database with the structured query.
 - **Image uploads**: Handled via `express-fileupload` with temp files; uploaded directly to Cloudinary. Product and category endpoints also accept plain image URLs (`imageUrls` / `imageUrl`) for quick seeding.
 - **Categories**: Products reference categories by name (string column); the dashboard dropdown and storefront grid are populated from the categories API.

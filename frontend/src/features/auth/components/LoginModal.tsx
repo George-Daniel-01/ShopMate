@@ -7,6 +7,7 @@ import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { login } from "@/features/auth/authSlice";
 import { clearPendingCheckout, setAuthPopupView, toggleAuthPopup } from "@/app/popupSlice";
+import GoogleSignInButton from "@/features/auth/components/GoogleSignInButton";
 import type { AppDispatch } from "@/app/store";
 import type { RootState } from "@/types";
 
@@ -68,6 +69,15 @@ const LoginModal = () => {
           </button>
         </p>
       </form>
+      <div className="relative my-4">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase tracking-wide">
+          <span className="bg-card px-2 text-muted-foreground">or</span>
+        </div>
+      </div>
+      <GoogleSignInButton />
       <p className="mt-4 text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}
         <button

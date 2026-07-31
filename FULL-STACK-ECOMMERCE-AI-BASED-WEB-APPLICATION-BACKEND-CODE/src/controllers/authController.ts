@@ -1,7 +1,13 @@
 import { Request, Response, NextFunction } from "express";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
-import { sendToken } from "../utils/jwtToken.js";
+import { sendToken, setAuthCookie } from "../utils/jwtToken.js";
+import crypto from "crypto";
+import {
+  buildGoogleAuthUrl,
+  findOrCreateGoogleUser,
+  getGoogleProfile,
+} from "../services/googleOAuthService.js";
 import { generateEmailTemplate } from "../utils/generateForgotPasswordEmailTemplate.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { v2 as cloudinary } from "cloudinary";
@@ -139,5 +145,54 @@ export const makeAdmin = catchAsyncErrors(
     const { email } = req.body as { email: string };
     const user = await promoteToAdmin(email);
     res.status(200).json({ success: true, message: "User promoted to Admin.", user });
+  }
+);
+
+export const googleAuth = catchAsyncErrors(
+  async (_req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const state = crypto.randomBytes(16).toString("hex");
+    res.cookie("google_oauth_state", state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 10 * 60 * 1000,
+    });
+    res.redirect(buildGoogleAuthUrl(state));
+  }
+);
+
+export const googleCallback = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { code, state, error } = req.query as {
+      code?: string;
+      state?: string;
+      error?: string;
+    };
+    const clearStateCookie = () =>
+      res.clearCookie("google_oauth_state", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+      });
+    const frontendUrl = process.env.FRONTEND_URL || "https://shop-mate-six-azure.vercel.app";
+    if (error) {
+      clearStateCookie();
+      return res.redirect(`${frontendUrl}?google=error`);
+    }
+    const stateCookie = req.cookies?.google_oauth_state;
+    if (stateCookie && state !== stateCookie) {
+      return next(new ErrorHandler("Invalid OAuth state.", 400));
+    }
+    if (!code) {
+      clearStateCookie();
+      return res.redirect(`${frontendUrl}?google=error`);
+    }
+
+    const profile = await getGoogleProfile(code);
+    const user = await findOrCreateGoogleUser(profile);
+    setAuthCookie(user, res);
+    clearStateCookie();
+
+    res.redirect(`${frontendUrl}?google=success`);
   }
 );

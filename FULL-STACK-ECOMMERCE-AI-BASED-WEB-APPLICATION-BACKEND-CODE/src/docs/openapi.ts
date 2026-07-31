@@ -143,6 +143,36 @@ export default {
       },
     },
 
+    "/auth/google": {
+      get: {
+        tags: ["Auth"],
+        summary: "Continue with Google",
+        description: "Redirects the user to Google's consent screen. After sign-in, the browser is redirected back to the frontend with an auth cookie set.",
+        operationId: "googleAuth",
+        responses: {
+          "302": { description: "Redirect to Google consent screen" },
+          "500": { description: "Google OAuth is not configured on the server" },
+        },
+      },
+    },
+
+    "/auth/google/callback": {
+      get: {
+        tags: ["Auth"],
+        summary: "Google OAuth callback",
+        description: "Exchanges the Google authorization code, finds or creates the user by email, sets the JWT cookie and redirects to the frontend.",
+        operationId: "googleCallback",
+        parameters: [
+          { name: "code", in: "query", required: true, schema: { type: "string" } },
+          { name: "state", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "302": { description: "Redirect to the frontend with ?google=success" },
+          "400": { description: "Invalid OAuth state or cancelled sign-in" },
+        },
+      },
+    },
+
     "/auth/me": {
       get: {
         tags: ["Auth"],

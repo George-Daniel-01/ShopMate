@@ -10,6 +10,7 @@ export async function createUserTable() {
         password VARCHAR(255) NOT NULL,
         role VARCHAR(10) DEFAULT 'User',
         avatar JSONB DEFAULT NULL,
+        google_id TEXT DEFAULT NULL,
         reset_password_token TEXT DEFAULT NULL,
         reset_password_expire TIMESTAMP DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -35,6 +36,7 @@ export async function createUserTable() {
     await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255) NOT NULL DEFAULT 'temp_password'`);
     await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(10) DEFAULT 'User'`);
     await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar JSONB DEFAULT NULL`);
+    await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT DEFAULT NULL`);
     await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_token TEXT DEFAULT NULL`);
     await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_expire TIMESTAMP DEFAULT NULL`);
     await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);

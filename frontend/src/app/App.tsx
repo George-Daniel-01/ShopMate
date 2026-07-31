@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { ToastContainer } from "react-toastify";
+import { ToastContainer, toast } from "react-toastify";
 import { ThemeProvider } from "./ThemeContext";
 import ScrollToTop from "./ScrollToTop";
 import ErrorBoundary from "./ErrorBoundary";
@@ -47,6 +47,18 @@ const App = () => {
   const dispatch = useDispatch<AppDispatch>();
 
   useEffect(() => { dispatch(getUser()); }, [dispatch]);
+
+  // Handle Google OAuth redirect results (?google=success | ?google=error)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const googleResult = params.get("google");
+    if (googleResult === "error") {
+      toast.error("Google sign-in was cancelled. Please try again.");
+    }
+    if (googleResult) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   if (isCheckingAuth) {
     return (

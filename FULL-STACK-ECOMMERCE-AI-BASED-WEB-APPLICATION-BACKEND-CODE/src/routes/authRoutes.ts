@@ -2,6 +2,8 @@ import express from "express";
 import {
   forgotPassword,
   getUser,
+  googleAuth,
+  googleCallback,
   login,
   logout,
   makeAdmin,
@@ -30,6 +32,8 @@ router.post("/register", validate(registerSchema), register);
 router.post("/register-admin", validate(registerAdminSchema), registerAdmin);
 router.post("/make-admin", validate(makeAdminSchema), makeAdmin);
 router.post("/login", validate(loginSchema), login);
+router.get("/google", googleAuth);
+router.get("/google/callback", googleCallback);
 router.get("/me", isAuthenticated, getUser);
 router.get("/logout", isAuthenticated, logout);
 router.post("/password/forgot", validate(forgotPasswordSchema), forgotPassword);
