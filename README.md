@@ -26,7 +26,7 @@ ShopMate/
 ## Features
 
 ### Storefront (Customer-Facing)
-- Hero slider, category grid, new arrivals, and top-rated product sections
+- Hero slider, category grid (pulled live from the backend categories API), new arrivals, and top-rated product sections
 - Product listing with filters: category, price range, rating, availability
 - AI-powered product search using OpenRouter (GPT-4o-mini)
 - Product detail pages with image gallery and customer reviews
@@ -40,7 +40,8 @@ ShopMate/
 ### Admin Dashboard
 - Dashboard with revenue stats, monthly sales charts, order status pie chart, and top product bar chart
 - User management: view and delete users with pagination
-- Product management: create, update, delete products with Cloudinary image upload
+- Product management: create, update, delete products with multi-image Cloudinary upload (paste / drag & drop / file picker) — including full image replacement when updating
+- **Category management**: create, edit, and delete store categories with images; live category dropdown in product forms (no more hardcoded lists)
 - Order management: view all orders, update order status, delete orders
 - Admin profile and password update
 
@@ -48,10 +49,11 @@ ShopMate/
 - JWT authentication with HTTP-only cookies
 - Role-based access control (User / Admin)
 - PostgreSQL database with auto-table creation on startup
-- Cloudinary integration for image storage
+- Cloudinary integration for image storage (products, categories, avatars)
 - Stripe payment intents and webhook handling
 - Password reset via email (Nodemailer)
-- AI product recommendation endpoint (OpenRouter / GPT-4o-mini)
+- AI product search endpoint (OpenRouter / GPT-4o-mini)
+- Health check endpoint with automatic table creation and schema diagnostics
 
 ---
 
@@ -59,7 +61,7 @@ ShopMate/
 
 | Layer | Technology |
 |---|---|
-| Frontend & Dashboard | React 18, Vite, Redux Toolkit, Tailwind CSS, **TypeScript** |
+| Frontend & Dashboard | React 19, Vite, Redux Toolkit, Tailwind CSS, **TypeScript** |
 | Backend | Node.js, Express.js, **TypeScript** |
 | Database | PostgreSQL (via `pg` pool), hosted on Neon |
 | Authentication | JWT, bcrypt, HTTP-only cookies |
@@ -77,7 +79,7 @@ ShopMate/
 - Node.js v18+
 - TypeScript (installed automatically via `npm install`)
 - A PostgreSQL database (e.g., [Neon](https://neon.tech))
-- Accounts for: Cloudinary, Stripe, Google AI Studio (Gemini), an SMTP email provider
+- Accounts for: Cloudinary, Stripe, OpenRouter, an SMTP email provider
 
 ---
 
@@ -210,12 +212,21 @@ Content-Type: application/json
 |---|---|---|---|
 | GET | `/` | — | List all products (with filters & pagination) |
 | GET | `/singleProduct/:id` | — | Get a single product with reviews |
-| POST | `/admin/create` | Admin | Create a product |
+| POST | `/admin/create` | Admin | Create a product (multipart images **or** `imageUrls` JSON array) |
 | PUT | `/admin/update/:id` | Admin | Update a product |
 | DELETE | `/admin/delete/:id` | Admin | Delete a product |
 | PUT | `/post-new/review/:id` | ✅ | Post or update a review (delivered orders only) |
 | DELETE | `/delete/review/:id` | ✅ | Delete own review |
 | POST | `/ai-search` | ✅ | AI-powered product search |
+
+### Categories — `/api/v1/category`
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| GET | `/` | — | List all categories with images and per-category product counts |
+| POST | `/admin/create` | Admin | Create a category (multipart image **or** `imageUrl` string) |
+| PUT | `/admin/update/:id` | Admin | Update a category (name / image) |
+| DELETE | `/admin/delete/:id` | Admin | Delete a category |
 
 ### Orders — `/api/v1/order`
 
@@ -242,6 +253,12 @@ Content-Type: application/json
 |---|---|---|---|
 | POST | `/webhook` | — | Stripe webhook (marks orders as paid, reduces stock) |
 
+### Health — `/api/v1/health`
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| GET | `/health` | — | DB + schema diagnostics (auto-creates missing tables, returns table inventory) |
+
 ---
 
 ## Database Schema
@@ -249,6 +266,7 @@ Content-Type: application/json
 | Table | Key Columns |
 |---|---|
 | `users` | id, name, email, password (hashed), role, avatar (JSONB), reset token |
+| `categories` | id, name (unique), image (JSONB), created_at |
 | `products` | id, name, description, price, category, stock, images (JSONB), ratings |
 | `orders` | id, buyer_id, total_price, tax_price, shipping_price, order_status, paid_at |
 | `order_items` | id, order_id, product_id, quantity, price, image, title |
@@ -281,9 +299,10 @@ https://your-backend.vercel.app/api/v1/payment/webhook
 - **TypeScript**: All three projects use strict TypeScript with full type coverage across components, Redux slices, API handlers, and database queries.
 - **Currency**: Prices are stored internally as numeric values. It is up to the frontend to display the appropriate currency symbol.
 - **Reviews**: Users can only review products from orders with status `Delivered`.
-- **Stock**: Automatically decremented when a Stripe `payment_intent.succeeded` webhook is received.
-- **AI Search**: Filters products from the database by keyword first, then passes up to 200 matches to Gemini for intelligent ranking.
-- **Image uploads**: Handled via `express-fileupload` with temp files; uploaded directly to Cloudinary.
+- **Stock**: Automatically decremented when a Stripe `payment_intent.succeeded` webhook is received. Products can be created/updated with `stock: 0` (out of stock).
+- **AI Search**: Extracts search parameters from natural language via OpenRouter (GPT-4o-mini), then filters the database with the structured query.
+- **Image uploads**: Handled via `express-fileupload` with temp files; uploaded directly to Cloudinary. Product and category endpoints also accept plain image URLs (`imageUrls` / `imageUrl`) for quick seeding.
+- **Categories**: Products reference categories by name (string column); the dashboard dropdown and storefront grid are populated from the categories API.
 
 ---
 
