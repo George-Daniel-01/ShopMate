@@ -49,38 +49,38 @@ const Categories = () => {
 
   return (
     <>
-      <main className="p-[10px] pl-[10px] md:pl-[17rem] w-full">
+      <main className="p-4 pl-4 md:pl-[17rem] w-full">
         <div className="flex-1 md:p-6">
           <Header />
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div>
               <h1 className="text-2xl font-bold">All Categories</h1>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 Manage your store categories.
               </p>
             </div>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search categories..."
-                className="border border-gray-300 rounded-md pl-9 pr-3 py-2 text-sm w-full sm:w-64 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
+                className="border border-input rounded-md pl-9 pr-3 py-2 text-sm w-full sm:w-64 bg-card focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
           </div>
-          <div className="p-4 sm:p-8 bg-gray-50 min-h-screen">
+          <div className="p-4 sm:p-8 bg-background min-h-screen">
             {loading ? (
-              <div className="w-40 h-40 mx-auto border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+              <div className="w-40 h-40 mx-auto border-2 border-input border-t-transparent rounded-full animate-spin" />
             ) : visibleCategories.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {visibleCategories.map((category) => (
                   <div
                     key={category.id}
-                    className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden"
+                    className="bg-card rounded-lg border border-border shadow-sm overflow-hidden"
                   >
-                    <div className="h-32 bg-gray-100 overflow-hidden">
+                    <div className="h-32 bg-muted overflow-hidden">
                       <img
                         src={category?.image?.url || "/placeholder.png"}
                         alt={category.name}
@@ -89,14 +89,14 @@ const Categories = () => {
                     </div>
                     <div className="p-4">
                       <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-gray-900">{category.name}</h3>
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                        <h3 className="font-bold text-foreground">{category.name}</h3>
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                           {category.product_count ?? 0} products
                         </span>
                       </div>
                       <div className="flex gap-2 mt-3">
                         <button
-                          className="flex-1 text-white rounded-md cursor-pointer px-3 py-2 text-sm font-semibold bg-[#111827] hover:bg-gray-800"
+                          className="flex-1 text-primary-foreground rounded-md cursor-pointer px-3 py-2 text-sm font-semibold bg-primary hover:bg-primary/90"
                           onClick={() => {
                             setSelectedCategory(category);
                             dispatch(toggleUpdateCategoryModal());
@@ -122,11 +122,11 @@ const Categories = () => {
               </div>
             ) : (
               <div className="text-center py-16">
-                <Tags className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-                <h3 className="text-2xl font-bold text-gray-700">
+                <Tags className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                <h3 className="text-2xl font-bold text-foreground">
                   {searchQuery ? "No categories match your search." : "No categories yet."}
                 </h3>
-                <p className="text-gray-500 mt-1 text-sm">
+                <p className="text-muted-foreground mt-1 text-sm">
                   Click the + button to create your first category.
                 </p>
               </div>
@@ -136,7 +136,7 @@ const Categories = () => {
 
         <button
           onClick={() => dispatch(toggleCreateCategoryModal())}
-          className="fixed bottom-6 right-6 bg-[#111827] hover:bg-gray-800 text-white p-4 rounded-full shadow-lg z-30"
+          className="fixed bottom-6 right-6 bg-primary hover:bg-primary/90 text-primary-foreground p-4 rounded-full shadow-lift z-30"
           title="Create New Category"
         >
           <Plus size={20} />

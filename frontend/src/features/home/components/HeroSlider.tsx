@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const HeroSlider = () => {
@@ -54,29 +54,34 @@ const HeroSlider = () => {
   const slide = slides[currentSlide];
 
   return (
-    <div className="relative h-[60vh] sm:h-[70vh] overflow-hidden rounded-2xl">
+    <div className="relative h-[68vh] sm:h-[76vh] overflow-hidden rounded-3xl mx-4 sm:mx-6 mt-20 sm:mt-24">
       {/* Single Active Slide */}
       <div className="relative h-full">
-        <div className="absolute inset-0 bg-cover bg-center animate-ken-burns"
+        <div
+          className="absolute inset-0 bg-cover bg-center animate-ken-burns"
           style={{ backgroundImage: `url(${slide.image})` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
-        <div className="relative h-full flex items-center justify-center text-center px-4 sm:px-6">
-          <div className="max-w-3xl animate-fade-in-up">
-            <h3 className="text-base sm:text-lg font-medium text-white/90 mb-2">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-black/10" />
+        <div className="relative h-full flex items-center px-6 sm:px-12 lg:px-16">
+          <div
+            key={slide.id}
+            className="max-w-2xl text-left text-white animate-fade-in-up"
+          >
+            <p className="inline-flex items-center gap-2 text-sm sm:text-base font-medium text-white/85 bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1.5 mb-5 tracking-wide uppercase">
               {slide.subtitle}
-            </h3>
-            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold text-white mb-4 drop-shadow-lg">
+            </p>
+            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold leading-[1.05] mb-5 tracking-tight drop-shadow-lg">
               {slide.title}
             </h1>
-            <p className="text-base sm:text-xl text-white/85 mb-6 sm:mb-8 max-w-2xl mx-auto">
+            <p className="text-base sm:text-xl text-white/85 mb-8 max-w-xl leading-relaxed">
               {slide.description}
             </p>
             <Link
               to={slide.url}
-              className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-gray-900 rounded-lg hover:bg-gray-100 hover:shadow-[var(--shadow-elegant)] animate-smooth font-semibold text-base sm:text-lg"
+              className="group inline-flex items-center gap-2 px-7 sm:px-8 py-3.5 sm:py-4 bg-white text-gray-900 rounded-full hover:bg-gray-50 hover:shadow-[var(--shadow-elegant)] hover:-translate-y-0.5 animate-smooth font-semibold text-base sm:text-lg"
             >
               {slide.cta}
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
         </div>
@@ -85,27 +90,30 @@ const HeroSlider = () => {
       {/* Arrows */}
       <button
         onClick={prevSlide}
-        className="hidden sm:block absolute left-6 top-1/2 transform -translate-y-1/2 p-3 glass-card hover:glow-on-hover animate-smooth"
+        aria-label="Previous slide"
+        className="hidden sm:flex absolute left-6 top-1/2 -translate-y-1/2 w-11 h-11 items-center justify-center rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/25 transition-colors"
       >
-        <ChevronLeft className="w-6 h-6 text-primary" />
+        <ChevronLeft className="w-6 h-6" />
       </button>
       <button
         onClick={nextSlide}
-        className="hidden sm:block absolute right-6 top-1/2 transform -translate-y-1/2 p-3 glass-card hover:glow-on-hover animate-smooth"
+        aria-label="Next slide"
+        className="hidden sm:flex absolute right-6 top-1/2 -translate-y-1/2 w-11 h-11 items-center justify-center rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/25 transition-colors"
       >
-        <ChevronRight className="w-6 h-6 text-primary" />
+        <ChevronRight className="w-6 h-6" />
       </button>
 
       {/* Dots */}
-      <div className="absolute bottom-4 sm:bottom-6 left-1/2 transform -translate-x-1/2 flex space-x-2 sm:space-x-3">
+      <div className="absolute bottom-5 sm:bottom-7 left-1/2 -translate-x-1/2 flex items-center space-x-2.5">
         {slides.map((_, index) => (
           <button
             key={index}
             onClick={() => setCurrentSlide(index)}
-            className={`w-3 h-3 rounded-full transition-all duration-300 ${
+            aria-label={`Go to slide ${index + 1}`}
+            className={`rounded-full transition-all duration-300 ${
               index === currentSlide
-                ? "bg-primary glow-primary"
-                : "bg-white/30 hover:bg-white/50"
+                ? "w-8 h-2.5 bg-white"
+                : "w-2.5 h-2.5 bg-white/40 hover:bg-white/70"
             }`}
           />
         ))}

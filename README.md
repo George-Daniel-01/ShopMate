@@ -10,15 +10,24 @@
 
 A complete, production-ready e-commerce platform built with React, Node.js, PostgreSQL, and AI-powered product search. Includes a customer-facing storefront, an admin dashboard, and a REST API backend. The entire codebase is written in **strict TypeScript**.
 
+## ✨ Premium Upgrade Highlights
+
+This codebase recently went through a top-to-bottom premium refactor:
+
+- **Design system** — both frontends now run on a full semantic design-token system (colors, radius, shadows, focus rings) with **dark mode** and a live theme toggle.
+- **Storefront polish** — premium-minimal navbar, animated hero slider, product cards with hover lift + image zoom, refined buttons/inputs/badges, and the AI-search entry point wired to the search overlay.
+- **Admin dashboard rebuilt** — real React Router nested routes (no more string-based navigation), route-aware breadcrumb header, active sidebar states, and a small UI kit (`Card`, `StatCard`, `Badge`, `Button`, `Input`).
+- **Backend layering** — the Stripe webhook was extracted out of `app.ts` into `routes/paymentRoutes.ts` → `controllers/paymentController.ts` → `services/paymentService.ts`, leaving `app.ts` as a thin bootstrap.
+
 ---
 
 ## Project Structure
 
 ```
 ShopMate/
-├── frontend/                            # Customer storefront (React + Vite + TypeScript)
-├── ecommerce-dashboard-template/        # Admin dashboard (React + Vite + TypeScript)
-└── FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE/   # Node.js API (TypeScript)
+├── frontend/                                     # Customer storefront (React 19 + Vite + TS)
+├── ecommerce-dashboard-template/                 # Admin dashboard (React 19 + Vite + TS)
+└── FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE/   # Node.js API (TS — routes → controllers → services)
 ```
 
 ---
@@ -26,7 +35,7 @@ ShopMate/
 ## Features
 
 ### Storefront (Customer-Facing)
-- Hero slider, category grid (pulled live from the backend categories API), new arrivals, and top-rated product sections
+- Animated hero slider (pill CTA + indicator dots), category grid (pulled live from the backend categories API), new arrivals, and top-rated product sections
 - Product listing with filters: category, price range, rating, availability
 - AI-powered product search using OpenRouter (GPT-4o-mini)
 - Product detail pages with image gallery and customer reviews
@@ -36,24 +45,30 @@ ShopMate/
 - Profile management: update name, email, avatar, and password
 - Order history with real-time status tracking (auto-refreshes every 30s)
 - Dark/light theme toggle
+- Premium-minimal design system — semantic tokens (colors, radius, shadows, focus rings) with dark-mode support
+- Polished product cards with hover lift, image zoom and lazy loading
 
 ### Admin Dashboard
-- Dashboard with revenue stats, monthly sales charts, order status pie chart, and top product bar chart
+- Dashboard with revenue stats, monthly sales charts, order status pie chart, and top product bar chart (Recharts)
 - User management: view and delete users with pagination
 - Product management: create, update, delete products with multi-image Cloudinary upload (paste / drag & drop / file picker) — including full image replacement when updating
 - **Category management**: create, edit, and delete store categories with images; live category dropdown in product forms (no more hardcoded lists)
 - Order management: view all orders, update order status, delete orders
 - Admin profile and password update
+- Premium design system — semantic tokens with dark mode + theme toggle
+- Real React Router nested navigation with route-aware breadcrumbs and active sidebar states
+- Reusable UI kit: `Card`, `StatCard`, `Badge`, `Button`, `Input`
 
 ### Backend API
 - JWT authentication with HTTP-only cookies
 - Role-based access control (User / Admin)
 - PostgreSQL database with auto-table creation on startup
 - Cloudinary integration for image storage (products, categories, avatars)
-- Stripe payment intents and webhook handling
+- Stripe payment intents and webhook handling (layered `routes → controllers → services`, webhook extracted out of `app.ts`)
 - Password reset via email (Nodemailer)
 - AI product search endpoint (NVIDIA NIM Nemotron via OpenRouter-compatible API, OpenRouter GPT-4o-mini fallback)
 - Health check endpoint with automatic table creation and schema diagnostics
+- Interactive API docs — OpenAPI 3.0 spec served with Swagger UI at `/api/v1/docs`
 
 ---
 
@@ -193,6 +208,8 @@ Content-Type: application/json
 
 ## API Reference
 
+> Interactive documentation: **https://shop-mate-backend.vercel.app/api/v1/docs** (Swagger UI) · raw spec: `/api/v1/docs/swagger.json`
+
 ### Auth — `/api/v1/auth`
 
 | Method | Endpoint | Auth | Description |
@@ -279,7 +296,16 @@ Content-Type: application/json
 
 ## Deployment
 
-All three projects include a `vercel.json` for one-click Vercel deployment.
+All three projects include a `vercel.json` and auto-deploy from the `main` branch:
+
+| App | Live URL |
+|---|---|
+| Storefront | https://shop-mate-six-azure.vercel.app |
+| Admin dashboard | https://shop-dashboard-tan.vercel.app |
+| Backend API | https://shop-mate-backend.vercel.app |
+| API Docs (Swagger UI) | https://shop-mate-backend.vercel.app/api/v1/docs |
+
+> For CLI deployments (both Vercel projects use a **Root Directory** setting), see the "Deploying from the CLI" section in [`OPERATIONS.md`](./OPERATIONS.md).
 
 **Backend** — set all environment variables from `config.env` in your Vercel project settings.
 

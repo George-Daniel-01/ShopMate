@@ -1,30 +1,52 @@
 import { useEffect, useState } from "react";
+import { DollarSign, Users, Wallet } from "lucide-react";
 import { formatNumber } from "../../../lib/helper";
 import { useAppSelector } from "../../../app/hooks";
+import StatCard from "../../../components/ui/StatCard";
 
 const Stats = () => {
   const [revenueChange, setRevenueChange] = useState("");
-  const { totalUsersCount, todayRevenue, yesterdayRevenue, totalRevenueAllTime } = useAppSelector((state) => state.admin);
+  const {
+    totalUsersCount,
+    todayRevenue,
+    yesterdayRevenue,
+    totalRevenueAllTime,
+  } = useAppSelector((state) => state.admin);
 
   useEffect(() => {
-    const change = yesterdayRevenue === 0 ? 100 : ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100;
-    setRevenueChange(`${change >= 0 ? "+" : "-"}${change.toFixed(2)}% from yesterday`);
+    const change =
+      yesterdayRevenue === 0
+        ? 100
+        : ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100;
+    setRevenueChange(`${change >= 0 ? "+" : "-"}${change.toFixed(2)}%`);
   }, [todayRevenue, yesterdayRevenue]);
 
   const stats = [
-    { title: "Today Revenue", value: formatNumber(todayRevenue), change: revenueChange },
-    { title: "Total Users", value: totalUsersCount || 0, change: null },
-    { title: "All Time Revenue", value: formatNumber(totalRevenueAllTime), change: null },
+    {
+      title: "Today Revenue",
+      value: `$${formatNumber(todayRevenue)}`,
+      change: revenueChange,
+      icon: Wallet,
+      tone: "primary" as const,
+    },
+    {
+      title: "Total Users",
+      value: totalUsersCount || 0,
+      icon: Users,
+      tone: "accent" as const,
+    },
+    {
+      title: "All Time Revenue",
+      value: `$${formatNumber(totalRevenueAllTime)}`,
+      icon: DollarSign,
+      tone: "success" as const,
+    },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {stats.map((stat, index) => (
-        <div key={index} className={`bg-white p-4 rounded-xl shadow-md ${index !== 0 && "flex gap-2 flex-col"}`}>
-          <div className="text-sm text-gray-500">{stat.title}</div>
-          <div className={`text-xl font-semibold ${index !== 0 && "text-[30px] overflow-y-hidden"}`}>{stat.value}</div>
-          {stat.change && <div className={`text-sm ${stat.change.startsWith("+") ? "text-green-500" : "text-red-500"}`}>{stat.change} than last period</div>}
-        </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      {stats.map((stat) => (
+        <StatCard key={stat.title} {...stat} />
       ))}
     </div>
   );

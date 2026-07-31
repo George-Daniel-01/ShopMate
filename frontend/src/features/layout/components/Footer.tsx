@@ -1,12 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { toast } from "react-toastify";
-import {
-  Github,
-  Mail,
-  Phone,
-  MapPin,
-} from "lucide-react";
+import { Github, Mail, Phone, MapPin, ArrowRight } from "lucide-react";
 
 const Footer = () => {
   const [email, setEmail] = useState("");
@@ -36,138 +31,118 @@ const Footer = () => {
     { icon: Mail, href: "mailto:georgeabiamakadaniel@gmail.com", label: "Email" },
   ];
 
+  const LinkColumn = ({
+    title,
+    links,
+  }: {
+    title: string;
+    links: { name: string; path: string }[];
+  }) => (
+    <div>
+      <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
+        {title}
+      </h3>
+      <ul className="space-y-2.5">
+        {links.map((link) => (
+          <li key={link.name}>
+            <Link
+              to={link.path}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {link.name}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
   return (
-    <footer className="glass border-t border-[hsla(var(--glass-border))] mt-16">
-      <div className="container mx-auto px-4 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+    <footer className="border-t border-border mt-20 bg-secondary/30">
+      <div className="container mx-auto px-4 sm:px-6 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 mb-14">
           {/* Brand & Contact */}
-          <div className="lg:col-span-1">
-            <h2 className="text-2xl font-bold gradient-primary bg-clip-text text-transparent mb-4">
-              ShopMate
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              Your trusted partner for online shopping. Discover amazing
-              products with exceptional quality and service.
+          <div className="lg:col-span-2">
+            <Link to="/" className="flex items-center gap-2 mb-4">
+              <span className="w-9 h-9 rounded-xl gradient-primary text-primary-foreground flex items-center justify-center text-lg font-bold">
+                S
+              </span>
+              <h2 className="text-2xl font-bold tracking-tight text-primary">
+                ShopMate
+              </h2>
+            </Link>
+            <p className="text-muted-foreground mb-6 max-w-sm leading-relaxed">
+              Your trusted partner for online shopping. Discover amazing products
+              with exceptional quality and service.
             </p>
             <div className="space-y-3">
-              <div className="flex items-center space-x-3 text-muted-foreground">
+              <div className="flex items-center gap-3 text-muted-foreground">
                 <Mail className="w-5 h-5 text-primary" />
-                <span>georgeabiamakadaniel@gmail.com</span>
+                <span className="text-sm">georgeabiamakadaniel@gmail.com</span>
               </div>
-              <div className="flex items-center space-x-3 text-muted-foreground">
+              <div className="flex items-center gap-3 text-muted-foreground">
                 <Phone className="w-5 h-5 text-primary" />
-                <span>07060512564</span>
+                <span className="text-sm">07060512564</span>
               </div>
-              <div className="flex items-center space-x-3 text-muted-foreground">
+              <div className="flex items-center gap-3 text-muted-foreground">
                 <MapPin className="w-5 h-5 text-primary" />
-                <span>Lagos, Nigeria</span>
+                <span className="text-sm">Lagos, Nigeria</span>
               </div>
             </div>
           </div>
 
-          {/* Company Links */}
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-4">
-              Company
-            </h3>
-            <ul className="space-y-2">
-              {footerLinks.company.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    to={link.path}
-                    className="text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Customer Service */}
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-4">
-              Customer Service
-            </h3>
-            <ul className="space-y-2">
-              {footerLinks.customer.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    to={link.path}
-                    className="text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Legal */}
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-4">
-              Legal
-            </h3>
-            <ul className="space-y-2">
-              {footerLinks.legal.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    to={link.path}
-                    className="text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <LinkColumn title="Company" links={footerLinks.company} />
+          <LinkColumn title="Customer Service" links={footerLinks.customer} />
+          <LinkColumn title="Legal" links={footerLinks.legal} />
         </div>
 
         {/* Newsletter Signup */}
-        <div className="glass-panel mb-12">
-          <div className="text-center mb-6">
-            <h3 className="text-xl font-semibold text-foreground mb-2">
-              Stay Connected
-            </h3>
-            <p className="text-muted-foreground">
-              Subscribe to our newsletter for exclusive offers and updates
-            </p>
-          </div>
+        <div className="glass-panel mb-12 max-w-3xl mx-auto text-center">
+          <h3 className="text-xl font-semibold text-foreground mb-2">
+            Stay Connected
+          </h3>
+          <p className="text-muted-foreground mb-6">
+            Subscribe to our newsletter for exclusive offers and updates
+          </p>
           <form
-              onSubmit={(e) => { e.preventDefault(); toast.success("Subscribed! Watch your inbox."); setEmail(""); }}
-              className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto"
-            >
+            onSubmit={(e) => {
+              e.preventDefault();
+              toast.success("Subscribed! Watch your inbox.");
+              setEmail("");
+            }}
+            className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto"
+          >
             <input
               type="email"
               placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="flex-1 px-4 py-3 bg-secondary border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground placeholder-muted-foreground"
+              className="flex-1 px-4 py-3 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-primary text-foreground placeholder-muted-foreground transition-all"
             />
             <button
               type="submit"
-              className="px-6 py-3 gradient-primary text-primary-foreground rounded-lg hover:glow-on-hover animate-smooth font-semibold"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 gradient-primary text-primary-foreground rounded-xl hover:shadow-[var(--shadow-elegant)] hover:-translate-y-0.5 animate-smooth font-semibold"
             >
               Subscribe
+              <ArrowRight className="w-4 h-4" />
             </button>
           </form>
         </div>
 
         {/* Social Links & Copyright */}
-        <div className="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-[hsla(var(--glass-border))]">
-          <div className="flex items-center space-x-4 mb-4 md:mb-0">
+        <div className="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-border gap-4">
+          <div className="flex items-center space-x-3">
             {socialLinks.map((social) => (
               <a
                 key={social.label}
                 href={social.href}
                 aria-label={social.label}
-                className="p-2 glass-card hover:glow-on-hover animate-smooth"
+                className="p-2.5 glass-card rounded-xl hover:-translate-y-0.5"
               >
                 <social.icon className="w-5 h-5 text-primary" />
               </a>
             ))}
           </div>
-
           <div className="text-center md:text-right">
             <p className="text-muted-foreground text-sm">
               © 2026 ShopMate. All rights reserved.

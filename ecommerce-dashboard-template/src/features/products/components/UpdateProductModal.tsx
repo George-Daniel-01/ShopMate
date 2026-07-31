@@ -81,10 +81,10 @@ const UpdateProductModal = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center p-4" onPaste={handlePaste}>
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+      <div className="bg-card rounded-lg border border-border shadow-sm w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
         <button
           onClick={() => dispatch(toggleUpdateProductModal())}
-          className="absolute top-4 right-4 text-gray-600 hover:text-red-500 text-xl"
+          className="absolute top-4 right-4 text-muted-foreground hover:text-red-500 text-xl"
         >
           &times;
         </button>
@@ -133,15 +133,15 @@ const UpdateProductModal = ({
             className="border px-4 py-2 rounded"
           />
           <div className="col-span-1 md:col-span-2">
-            <label className="block text-sm text-gray-600 mb-1">Product Images</label>
-            <div className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center hover:border-gray-400 transition-colors">
-              <p className="text-gray-500 text-sm mb-2">
+            <label className="block text-sm text-muted-foreground mb-1">Product Images</label>
+            <div className="border-2 border-dashed border-input rounded-md p-4 text-center hover:border-gray-400 transition-colors">
+              <p className="text-muted-foreground text-sm mb-2">
                 {replacingImages
                   ? "New images will replace the current ones."
                   : "Paste (Ctrl+V) - Drag & Drop - or Choose Files"}
               </p>
               <input type="file" multiple accept="image/*" onChange={(e) => addImages(Array.from(e.target.files ?? []))} className="hidden" id="updateFileInput" />
-              <label htmlFor="updateFileInput" className="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded cursor-pointer text-sm">Choose Files</label>
+              <label htmlFor="updateFileInput" className="bg-muted hover:bg-muted px-4 py-2 rounded cursor-pointer text-sm">Choose Files</label>
             </div>
             {previews.length > 0 && (
               <div className="flex gap-2 mt-2 flex-wrap">

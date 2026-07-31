@@ -7,20 +7,26 @@ import OrdersChart from "../components/OrdersChart";
 import TopProductsChart from "../components/TopProductsChart";
 
 const Dashboard = () => (
-  <main className="p-[10px] pl-[10px] md:pl-[17rem] w-full">
-    <div className="flex-1 md:p-6">
+  <main className="p-4 pl-4 md:pl-[17rem] w-full">
+    <div className="md:p-6 space-y-6">
       <Header />
-      <h1 className="text-2xl font-bold">Dashboard</h1>
-      <p>Check the sales and value.</p>
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Check the sales and value.
+        </p>
+      </div>
       <Stats />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <MonthlySalesChart />
         <OrdersChart />
         <TopProductsChart />
       </div>
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 py-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <TopSellingProducts />
-        <div><MiniSummary /></div>
+        <div>
+          <MiniSummary />
+        </div>
       </div>
     </div>
   </main>

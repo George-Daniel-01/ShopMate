@@ -1,4 +1,4 @@
-﻿export interface ProductImage {
+export interface ProductImage {
   url: string;
   public_id: string;
 }
@@ -119,7 +119,6 @@ export interface AdminState {
 }
 
 export interface ExtraState {
-  openedComponent: string;
   isNavbarOpened: boolean;
   isViewProductModalOpened: boolean;
   isCreateProductModalOpened: boolean;

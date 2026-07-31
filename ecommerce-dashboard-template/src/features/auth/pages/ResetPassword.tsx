@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
+import { Lock, KeyRound } from "lucide-react";
 import { resetPassword } from "../authSlice";
 import { useAppDispatch, useAppSelector } from "../../../app/hooks";
+import Button from "../../../components/ui/Button";
+import Input from "../../../components/ui/Input";
 
 const ResetPassword = () => {
   const { token } = useParams<{ token: string }>();
@@ -20,25 +23,44 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="bg-white shadow-sm border border-gray-200 rounded-lg max-w-md w-full p-8 sm:p-10">
-        <h2 className="text-2xl font-bold text-center text-gray-900 mb-1">Reset Password</h2>
-        <p className="text-sm text-center text-gray-500 mb-6">Choose a new password for your account</p>
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="p-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-            <input type="password" name="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required placeholder="Enter your new password" className="w-full px-3.5 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900" />
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold">
+            S
           </div>
-          <div className="p-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-            <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} required placeholder="Confirm your password" className="w-full px-3.5 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900" />
-          </div>
-          <div className="px-2">
-            <button type="submit" disabled={loading} className="w-full flex justify-center items-center gap-2 rounded-md bg-[#111827] hover:bg-gray-800 text-white font-semibold py-2.5 text-sm disabled:opacity-50">
-              {loading ? (<><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>Resetting...</span></>) : "Reset Password"}
-            </button>
-          </div>
-        </form>
+          <h1 className="text-2xl font-bold text-foreground">Reset Password</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Choose a new password for your account
+          </p>
+        </div>
+        <div className="card-surface p-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <Input
+              label="New Password"
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              required
+              placeholder="Enter your new password"
+              icon={<Lock className="w-4 h-4" />}
+            />
+            <Input
+              label="Confirm Password"
+              type="password"
+              name="confirmPassword"
+              value={formData.confirmPassword}
+              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              required
+              placeholder="Confirm your password"
+              icon={<KeyRound className="w-4 h-4" />}
+            />
+            <Button type="submit" size="lg" className="w-full" loading={loading} disabled={loading}>
+              Reset Password
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   );

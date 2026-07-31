@@ -1,14 +1,12 @@
 import { lazy, Suspense, useEffect } from "react";
-import type { ComponentType } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { Loader } from "lucide-react";
-import SideBar from "@/features/layout/components/SideBar";
 import Login from "@/features/auth/pages/Login";
 import ForgotPassword from "@/features/auth/pages/ForgotPassword";
 import ResetPassword from "@/features/auth/pages/ResetPassword";
+import DashboardLayout from "@/features/layout/components/DashboardLayout";
 import { getUser } from "@/features/auth/authSlice";
-import { getDashboardStats } from "@/features/dashboard/adminSlice";
 import { useAppDispatch, useAppSelector } from "./hooks";
 
 // Dashboard sections are lazy-loaded so each one only loads when opened
@@ -19,47 +17,24 @@ const Profile = lazy(() => import("@/features/profile/pages/ProfilePage"));
 const Products = lazy(() => import("@/features/products/pages/ProductsPage"));
 const Categories = lazy(() => import("@/features/categories/pages/CategoriesPage"));
 
-const SECTIONS: Record<string, ComponentType> = {
-  Dashboard,
-  Orders,
-  Users,
-  Profile,
-  Products,
-  Categories,
-};
+const PageLoader = () => (
+  <div className="flex items-center justify-center h-64">
+    <Loader className="w-8 h-8 animate-spin text-primary" />
+  </div>
+);
 
 function App() {
-  const { openedComponent } = useAppSelector((state) => state.extra);
-  const { user, isAuthenticated, loading } = useAppSelector((state) => state.auth);
+  const { loading } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
 
   useEffect(() => {
     dispatch(getUser());
   }, [dispatch]);
 
-  useEffect(() => {
-    if (isAuthenticated) dispatch(getDashboardStats());
-  }, [dispatch, isAuthenticated]);
-
-  const renderDashboardContent = () => {
-    const Section = SECTIONS[openedComponent] ?? Dashboard;
-    return (
-      <Suspense
-        fallback={
-          <div className="flex items-center justify-center h-64">
-            <Loader className="w-8 h-8 animate-spin text-blue-500" />
-          </div>
-        }
-      >
-        <Section />
-      </Suspense>
-    );
-  };
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader className="w-10 h-10 animate-spin text-blue-500" />
+      <div className="flex items-center justify-center h-screen bg-background">
+        <Loader className="w-10 h-10 animate-spin text-primary" />
       </div>
     );
   }
@@ -70,20 +45,15 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/password/forgot" element={<ForgotPassword />} />
         <Route path="/password/reset/:token" element={<ResetPassword />} />
-        <Route
-          path="/"
-          element={
-            isAuthenticated && user?.role === "ADMIN" ? (
-              <div className="flex min-h-screen">
-                <SideBar />
-                {renderDashboardContent()}
-              </div>
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route path="*" element={<Navigate to="/" />} />
+        <Route path="/" element={<DashboardLayout />}>
+          <Route index element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+          <Route path="orders" element={<Suspense fallback={<PageLoader />}><Orders /></Suspense>} />
+          <Route path="products" element={<Suspense fallback={<PageLoader />}><Products /></Suspense>} />
+          <Route path="categories" element={<Suspense fallback={<PageLoader />}><Categories /></Suspense>} />
+          <Route path="users" element={<Suspense fallback={<PageLoader />}><Users /></Suspense>} />
+          <Route path="profile" element={<Suspense fallback={<PageLoader />}><Profile /></Suspense>} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster position="bottom-center" />
     </Router>

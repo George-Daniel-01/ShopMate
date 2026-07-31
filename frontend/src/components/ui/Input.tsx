@@ -9,13 +9,13 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 const Input = ({ icon, className, ...props }: InputProps) => (
   <div className="relative">
     {icon && (
-      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none">
+      <span className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none">
         {icon}
       </span>
     )}
     <input
       className={cn(
-        "w-full pl-10 pr-4 py-3 bg-secondary border border-border rounded-lg focus:outline-none",
+        "w-full pl-10 pr-4 py-3 bg-secondary border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-primary transition-all placeholder-muted-foreground text-foreground",
         className
       )}
       {...props}

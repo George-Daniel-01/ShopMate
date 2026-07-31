@@ -70,23 +70,20 @@ const ProductCard = ({ product }: { product: import("../../../types/index").Prod
       to={`/product/${product.id}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="w-full bg-card border border-border rounded-md p-4 hover:shadow-[var(--shadow-elegant)] animate-smooth group flex flex-col"
+      className="group flex flex-col w-full bg-card border border-border rounded-2xl p-4 hover:shadow-[var(--shadow-elegant)] hover:-translate-y-1 animate-smooth"
     >
-      <div className="relative overflow-hidden rounded-md mb-4">
+      <div className="relative overflow-hidden rounded-xl mb-4 aspect-[4/3] bg-secondary/40">
         <img
           src={hovered && images.length > 1 ? hoverImage : imageUrl}
           alt={product.name}
           onError={handleImageError}
-          className="w-full h-48 object-contain group-hover:scale-110 transition-all duration-300"
+          loading="lazy"
+          className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-500"
         />
 
         <div className="absolute top-3 left-3 flex flex-col space-y-2">
-          {isNewProduct() && (
-            <Badge>NEW</Badge>
-          )}
-          {isTopRated() && (
-            <Badge variant="gold">TOP RATED</Badge>
-          )}
+          {isNewProduct() && <Badge>NEW</Badge>}
+          {isTopRated() && <Badge variant="gold">TOP RATED</Badge>}
         </div>
 
         {/* Wishlist heart */}
@@ -96,7 +93,7 @@ const ProductCard = ({ product }: { product: import("../../../types/index").Prod
           className={`absolute top-3 right-3 p-2 rounded-full transition-all duration-300 ${
             isWishlisted
               ? "bg-destructive text-white shadow-[var(--shadow-glow)]"
-              : "bg-white/90 backdrop-blur text-muted-foreground hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100"
+              : "bg-background/80 backdrop-blur text-muted-foreground hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100"
           }`}
         >
           <Heart className={`w-4 h-4 ${isWishlisted ? "fill-current" : ""}`} />
@@ -106,7 +103,7 @@ const ProductCard = ({ product }: { product: import("../../../types/index").Prod
         <button
           onClick={handleQuickView}
           title="Quick view"
-          className="absolute bottom-3 left-3 p-2 rounded-full bg-white/90 backdrop-blur text-foreground shadow-[var(--shadow-glow)] opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 hover:text-primary"
+          className="absolute bottom-3 left-3 p-2 rounded-full bg-background/80 backdrop-blur text-foreground shadow-[var(--shadow-glow)] opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 hover:text-primary"
         >
           <Eye className="w-4 h-4" />
         </button>
@@ -122,7 +119,7 @@ const ProductCard = ({ product }: { product: import("../../../types/index").Prod
       </div>
 
       <div className="flex flex-col flex-1">
-        <h3 className="text-base font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
+        <h3 className="text-base font-semibold text-foreground mb-2 group-hover:text-primary transition-colors line-clamp-2">
           {product.name}
         </h3>
 
@@ -134,7 +131,7 @@ const ProductCard = ({ product }: { product: import("../../../types/index").Prod
                 className={`w-4 h-4 ${
                   i < Math.floor(product.ratings || 0)
                     ? "text-yellow-400 fill-current"
-                    : "text-gray-300"
+                    : "text-muted"
                 }`}
               />
             ))}
@@ -144,7 +141,7 @@ const ProductCard = ({ product }: { product: import("../../../types/index").Prod
           </span>
         </div>
 
-        <div className="flex items-center justify-between mt-auto">
+        <div className="flex items-center justify-between mt-auto pt-2">
           <span className="text-xl font-bold text-primary">${product.price}</span>
           <Badge
             variant={

@@ -1,107 +1,145 @@
-import { Menu, User, ShoppingCart, Sun, Moon, Search, Heart } from "lucide-react";
+import type { ReactNode } from "react";
+import {
+  Menu,
+  User,
+  ShoppingCart,
+  Sun,
+  Moon,
+  Search,
+  Heart,
+  Sparkles,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTheme } from "../../../app/ThemeContext";
 import { useAppDispatch, useAppSelector } from "../../../app/hooks";
 import {
+  toggleAIModal,
   toggleAuthPopup,
   toggleCart,
   toggleSearchBar,
   toggleSidebar,
 } from "../../../app/popupSlice";
 
+const NAV_LINKS = [
+  { label: "Home", to: "/" },
+  { label: "Shop", to: "/products" },
+  { label: "About", to: "/about" },
+  { label: "FAQ", to: "/faq" },
+  { label: "Contact", to: "/contact" },
+];
+
+const IconButton = ({
+  label,
+  onClick,
+  children,
+  badge,
+}: {
+  label: string;
+  onClick?: () => void;
+  children: ReactNode;
+  badge?: number;
+}) => (
+  <button
+    onClick={onClick}
+    aria-label={label}
+    className="relative p-2 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors duration-200"
+  >
+    {children}
+    {typeof badge === "number" && badge > 0 && (
+      <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[18px] min-h-[18px] flex items-center justify-center px-1">
+        {badge > 99 ? "99+" : badge}
+      </span>
+    )}
+  </button>
+);
+
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
-
   const dispatch = useAppDispatch();
 
   const { cart } = useAppSelector((state) => state.cart);
   const { wishlist } = useAppSelector((state) => state.wishlist);
-  let cartItemsCount = 0;
-  if (cart) {
-    cartItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
-  }
+  const cartItemsCount = cart?.reduce((total, item) => total + item.quantity, 0) ?? 0;
 
   return (
-    <>
-      <nav className="fixed left-0 w-full top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            {/* LEFT - HAMBURGER MENU */}
+    <nav className="fixed left-0 w-full top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="flex items-center justify-between h-16 sm:h-[72px]">
+          {/* LEFT - MOBILE MENU */}
+          <div className="flex items-center gap-2">
             <button
               onClick={() => dispatch(toggleSidebar())}
-              className="p-1.5 sm:p-2 rounded-lg hover:bg-secondary transition-colors"
+              className="lg:hidden p-2 rounded-xl hover:bg-secondary text-muted-foreground transition-colors"
+              aria-label="Open menu"
             >
-              <Menu className="w-6 h-6 text-foreground" />
+              <Menu className="w-6 h-6" />
             </button>
+            {/* LOGO */}
+            <Link to="/" className="flex items-center gap-2 group">
+              <span className="w-9 h-9 rounded-xl gradient-primary text-primary-foreground flex items-center justify-center text-lg font-bold shadow-sm group-hover:scale-105 transition-transform">
+                S
+              </span>
+              <span className="hidden sm:block text-xl font-bold tracking-tight text-primary">
+                ShopMate
+              </span>
+            </Link>
+          </div>
 
-            {/* CENTER LOGO */}
-            <div className="flex-1 flex justify-center">
-              <Link to="/">
-                <h1 className="text-xl sm:text-2xl font-bold text-primary">ShopMate</h1>
-              </Link>
-            </div>
-
-            {/* RIGHT SIDE ICONS */}
-            <div className="flex items-center space-x-1 sm:space-x-2">
-              {/* THEME TOGGLE */}
-              <button
-                onClick={toggleTheme}
-                className="p-1.5 sm:p-2 rounded-lg hover:bg-secondary transition-colors"
-              >
-                {theme === "dark" ? (
-                  <Sun className="w-5 h-5 text-foreground" />
-                ) : (
-                  <Moon className="w-5 h-5 text-foreground" />
-                )}
-              </button>
-
-              {/* SEARCH OVERLAY */}
-              <button
-                onClick={() => dispatch(toggleSearchBar())}
-                className="p-1.5 sm:p-2 rounded-lg hover:bg-secondary transition-colors"
-              >
-                <Search className="w-5 h-5 text-foreground" />
-              </button>
-
-              {/* WISHLIST */}
+          {/* CENTER - DESKTOP NAV */}
+          <nav className="hidden lg:flex items-center gap-1">
+            {NAV_LINKS.map((link) => (
               <Link
-                to="/wishlist"
-                className="relative p-1.5 sm:p-2 rounded-lg hover:bg-secondary transition-colors"
-                title="Wishlist"
+                key={link.to}
+                to={link.to}
+                className="px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors duration-200"
               >
-                <Heart className="w-5 h-5 text-foreground" />
-                {wishlist.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {wishlist.length}
-                  </span>
-                )}
+                {link.label}
               </Link>
+            ))}
+          </nav>
 
-              {/* USER PROFILE */}
-              <button
-                onClick={() => dispatch(toggleAuthPopup())}
-                className="p-1.5 sm:p-2 rounded-lg hover:bg-secondary transition-colors"
-              >
-                <User className="w-5 h-5 text-foreground" />
-              </button>
+          {/* RIGHT SIDE ICONS */}
+          <div className="flex items-center gap-0.5 sm:gap-1">
+            <IconButton label="Toggle theme" onClick={toggleTheme}>
+              {theme === "dark" ? (
+                <Sun className="w-5 h-5" />
+              ) : (
+                <Moon className="w-5 h-5" />
+              )}
+            </IconButton>
 
-              {/* CART */}
-              <button
-                onClick={() => dispatch(toggleCart())}
-                className="relative p-1.5 sm:p-2 rounded-lg hover:bg-secondary transition-colors"
-              >
-                <ShoppingCart className="w-5 h-5 text-foreground" />
-                {cartItemsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {cartItemsCount}
-                  </span>
-                )}
-              </button>
-            </div>
+            <IconButton label="Search" onClick={() => dispatch(toggleSearchBar())}>
+              <Search className="w-5 h-5" />
+            </IconButton>
+
+            <IconButton label="AI Search" onClick={() => dispatch(toggleAIModal())}>
+              <Sparkles className="w-5 h-5" />
+            </IconButton>
+
+            <Link
+              to="/wishlist"
+              className="relative p-2 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors duration-200"
+              title="Wishlist"
+            >
+              <Heart className="w-5 h-5" />
+              {wishlist.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[18px] min-h-[18px] flex items-center justify-center px-1">
+                  {wishlist.length}
+                </span>
+              )}
+            </Link>
+
+            <IconButton label="Account" onClick={() => dispatch(toggleAuthPopup())}>
+              <User className="w-5 h-5" />
+            </IconButton>
+
+            <IconButton label="Cart" onClick={() => dispatch(toggleCart())} badge={cartItemsCount}>
+              <ShoppingCart className="w-5 h-5" />
+            </IconButton>
           </div>
         </div>
-      </nav>
-    </>
+      </div>
+    </nav>
   );
 };
 

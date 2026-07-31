@@ -33,7 +33,7 @@ const Badge = ({
 }: BadgeProps) => (
   <span
     className={cn(
-      "inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold whitespace-nowrap",
+      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap",
       VARIANT_CLASSES[variant],
       className
     )}

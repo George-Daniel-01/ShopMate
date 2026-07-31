@@ -3,7 +3,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ShopMate design tokens */
+/* ShopMate design tokens — premium minimal */
 
 @layer base {
   :root {
@@ -21,36 +21,36 @@
     --primary: 214 30% 16%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 94%;
+    --secondary: 220 14% 95%;
     --secondary-foreground: 220 6% 25%;
 
     --muted: 210 20% 97%;
-    --muted-foreground: 220 9% 46%;
+    --muted-foreground: 220 9% 44%;
 
-    --accent: 220 14% 94%;
+    --accent: 220 14% 95%;
     --accent-foreground: 220 6% 25%;
 
-    --destructive: 0 63% 24%;
+    --destructive: 0 63% 28%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 216 12% 84%;
-    --input: 216 12% 84%;
-    --ring: 218 11% 65%;
+    --border: 216 14% 86%;
+    --input: 216 14% 86%;
+    --ring: 214 30% 16%;
 
-    --radius: 0.25rem;
+    --radius: 0.625rem;
 
-    /* Cal.diy semantic surfaces */
-    --glass-bg: 220 14% 94% / 0.8;
-    --glass-border: 216 12% 84% / 0.6;
+    /* Semantic surfaces */
+    --glass-bg: 220 14% 95% / 0.7;
+    --glass-border: 216 14% 86% / 0.6;
     --glass-shadow: 0 0 0 / 0;
 
     --gradient-primary: linear-gradient(180deg, hsl(214 30% 19%), hsl(214 30% 13%));
-    --gradient-secondary: linear-gradient(180deg, hsl(220 14% 94%), hsl(220 13% 91%));
-    --gradient-glass: linear-gradient(180deg, hsla(220, 14%, 94%, 0.8), hsla(220, 13%, 91%, 0.6));
+    --gradient-secondary: linear-gradient(180deg, hsl(220 14% 95%), hsl(220 13% 92%));
+    --gradient-glass: linear-gradient(180deg, hsla(220, 14%, 95%, 0.7), hsla(220, 13%, 92%, 0.55));
 
-    --shadow-glow: 0px 1px 1px 0px rgba(0, 0, 0, 0.07), 0px 1px 2px 0px rgba(0, 0, 0, 0.08), 0px 2px 2px 0px rgba(0, 0, 0, 0.1);
-    --shadow-glass: 0px 1px 1px 0px rgba(0, 0, 0, 0.07), 0px 1px 2px 0px rgba(0, 0, 0, 0.08), 0px 2px 2px 0px rgba(0, 0, 0, 0.1);
-    --shadow-elegant: 0px 5px 20px 0px rgba(0, 0, 0, 0.1), 0px 10px 40px 0px rgba(0, 0, 0, 0.03);
+    --shadow-glow: 0px 1px 1px 0px rgba(0, 0, 0, 0.06), 0px 1px 2px 0px rgba(0, 0, 0, 0.07), 0px 2px 2px 0px rgba(0, 0, 0, 0.08);
+    --shadow-glass: 0px 1px 1px 0px rgba(0, 0, 0, 0.06), 0px 1px 2px 0px rgba(0, 0, 0, 0.07), 0px 2px 2px 0px rgba(0, 0, 0, 0.08);
+    --shadow-elegant: 0px 4px 16px 0px rgba(0, 0, 0, 0.08), 0px 12px 40px 0px rgba(0, 0, 0, 0.04);
 
     --animation-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --animation-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
@@ -59,7 +59,7 @@
     --sidebar-foreground: 220 6% 25%;
     --sidebar-primary: 214 30% 16%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 94%;
+    --sidebar-accent: 220 14% 95%;
     --sidebar-accent-foreground: 220 6% 25%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 218 11% 65%;
@@ -69,7 +69,7 @@
     --background: 0 0% 6%;
     --foreground: 0 0% 98%;
 
-    --card: 0 0% 6%;
+    --card: 0 0% 7%;
     --card-foreground: 0 0% 98%;
 
     --popover: 0 0% 9%;
@@ -81,8 +81,8 @@
     --secondary: 0 0% 15%;
     --secondary-foreground: 0 0% 83%;
 
-    --muted: 0 0% 9%;
-    --muted-foreground: 0 0% 64%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 63%;
 
     --accent: 0 0% 15%;
     --accent-foreground: 0 0% 83%;
@@ -90,9 +90,9 @@
     --destructive: 0 91% 71%;
     --destructive-foreground: 0 0% 0%;
 
-    --border: 0 0% 30%;
-    --input: 0 0% 30%;
-    --ring: 0 0% 45%;
+    --border: 0 0% 28%;
+    --input: 0 0% 28%;
+    --ring: 0 0% 80%;
 
     --gradient-primary: linear-gradient(180deg, hsl(0 0% 98%), hsl(0 0% 83%));
     --gradient-secondary: linear-gradient(180deg, hsl(0 0% 15%), hsl(0 0% 25%));
@@ -140,18 +140,18 @@
 }
 
 @layer components {
-  /* Cal.diy surface utilities */
+  /* Glass surfaces */
   .glass {
     @apply backdrop-blur-md bg-[hsla(var(--glass-bg))] border border-[hsla(var(--glass-border))];
     box-shadow: var(--shadow-glass);
   }
 
   .glass-panel {
-    @apply glass rounded-lg p-6;
+    @apply glass rounded-xl p-6;
   }
 
   .glass-card {
-    @apply glass rounded-md p-4 hover:shadow-[var(--shadow-elegant)] transition-all duration-300;
+    @apply glass rounded-lg p-4 hover:shadow-[var(--shadow-elegant)] transition-all duration-300;
   }
 
   /* Solid brand buttons (Cal.com style) */
@@ -238,6 +238,15 @@
     }
   }
 
+  @keyframes shimmer {
+    0% {
+      background-position: -400px 0;
+    }
+    100% {
+      background-position: 400px 0;
+    }
+  }
+
   .animate-slide-in-right {
     animation: slideInRight 0.3s ease-out;
   }
@@ -265,5 +274,16 @@
 
   .animate-ken-burns {
     animation: kenBurns 10s ease-out forwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

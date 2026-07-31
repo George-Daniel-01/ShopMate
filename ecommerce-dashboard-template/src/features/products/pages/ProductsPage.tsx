@@ -65,13 +65,13 @@ const Products = () => {
 
   return (
     <>
-      <main className="p-[10px] pl-[10px] md:pl-[17rem] w-full">
+      <main className="p-4 pl-4 md:pl-[17rem] w-full">
         <div className="flex-1 md:p-6">
           <Header />
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div>
               <h1 className="text-2xl font-bold">All Products</h1>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 Manage all your website products.
                 {lowStockCount > 0 && (
                   <span className="ml-2 inline-flex items-center gap-1 text-amber-600 font-medium">
@@ -81,32 +81,32 @@ const Products = () => {
               </p>
             </div>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search products..."
-                className="border border-gray-300 rounded-md pl-9 pr-3 py-2 text-sm w-full sm:w-64 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
+                className="border border-input rounded-md pl-9 pr-3 py-2 text-sm w-full sm:w-64 bg-card focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
           </div>
-          <div className="p-4 sm:p-8 bg-gray-50 min-h-screen">
+          <div className="p-4 sm:p-8 bg-background min-h-screen">
             <div
               className={`overflow-x-auto rounded-lg ${
                 // ✅ FIX: Only `loading` (fetch) triggers the full table spinner.
                 // `actionLoading` (delete/update) never hides the table.
                 loading
                   ? "p-10 shadow-none"
-                  : `${products && products.length > 0 && "shadow-lg"}`
+                  : `${products && products.length > 0 && "shadow-lift"}`
               }`}
             >
               {loading ? (
                 // Full-table spinner only on initial/page fetch
-                <div className="w-40 h-40 mx-auto border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                <div className="w-40 h-40 mx-auto border-2 border-input border-t-transparent rounded-full animate-spin" />
               ) : products && products.length > 0 ? (
-                <table className="min-w-full bg-white border border-gray-200">
-                  <thead className="bg-gray-100 text-gray-700">
+                <table className="min-w-full bg-card border border-border">
+                  <thead className="bg-muted text-foreground">
                     <tr>
                       <th className="py-3 px-4 text-left">Image</th>
                       <th className="py-3 px-4 text-left">Title</th>
@@ -121,7 +121,7 @@ const Products = () => {
                     {visibleProducts.map((product: Product, index: number) => (
                       <tr
                         key={product.id}
-                        className="border-t hover:bg-gray-50 cursor-pointer"
+                        className="border-t hover:bg-background cursor-pointer"
                         onClick={() => {
                           setSelectedProduct(product);
                           dispatch(toggleViewProductModal());
@@ -154,7 +154,7 @@ const Products = () => {
                         <td className="px-4 py-3 flex gap-2">
                           {/* Update button — opens modal, no loading state needed here */}
                           <button
-                            className="text-white rounded-md cursor-pointer px-3 py-2 font-semibold bg-[#111827] hover:bg-gray-800"
+                            className="text-primary-foreground rounded-md cursor-pointer px-3 py-2 font-semibold bg-primary hover:bg-primary/90"
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedProduct(product);
@@ -192,15 +192,15 @@ const Products = () => {
                 <button
                   onClick={() => setPage((p) => Math.max(p - 1, 1))}
                   disabled={page === 1}
-                  className="px-4 py-2 bg-[#111827] hover:bg-gray-800 text-white rounded disabled:opacity-50"
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded disabled:opacity-50"
                 >
                   Previous
                 </button>
-                <span className="px-4 py-2 text-gray-700">Page {page}</span>
+                <span className="px-4 py-2 text-foreground">Page {page}</span>
                 <button
                   onClick={() => setPage((p) => p + 1)}
                   disabled={maxPage === page}
-                  className="px-4 py-2 bg-[#111827] hover:bg-gray-800 text-white rounded disabled:opacity-50"
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded disabled:opacity-50"
                 >
                   Next
                 </button>
@@ -211,7 +211,7 @@ const Products = () => {
 
         <button
           onClick={() => dispatch(toggleCreateProductModal())}
-          className="fixed bottom-6 right-6 bg-[#111827] hover:bg-gray-800 text-white p-4 rounded-full shadow-lg z-30"
+          className="fixed bottom-6 right-6 bg-primary hover:bg-primary/90 text-primary-foreground p-4 rounded-full shadow-lift z-30"
           title="Create New Product"
         >
           <Plus size={20} />

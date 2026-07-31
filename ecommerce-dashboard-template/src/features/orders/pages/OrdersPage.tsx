@@ -69,36 +69,36 @@ const Orders = () => {
   };
 
   return (
-    <main className="p-[10px] pl-[10px] md:pl-[17rem] w-full">
+    <main className="p-4 pl-4 md:pl-[17rem] w-full">
       <div className="p-6">
         <Header />
         <h1 className="text-2xl font-bold mt-4">All Orders</h1>
-        <p className="text-sm text-gray-600 mb-6">Manage all your orders.</p>
+        <p className="text-sm text-muted-foreground mb-6">Manage all your orders.</p>
       </div>
       {loading ? (
-        <div className="w-40 h-40 mx-auto border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+        <div className="w-40 h-40 mx-auto border-2 border-input border-t-transparent rounded-full animate-spin" />
       ) : (
         <>
           <div className="flex flex-wrap justify-between items-center gap-3 p-6">
             <div className="flex flex-wrap gap-3 items-center">
-              <select value={filterByStatus} onChange={(e) => setFilterByStatus(e.target.value)} className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white">
+              <select value={filterByStatus} onChange={(e) => setFilterByStatus(e.target.value)} className="border border-input rounded-md px-3 py-2 text-sm bg-card">
                 {statusFilters.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search orders, customers, items..."
-                  className="border border-gray-300 rounded-md pl-9 pr-3 py-2 text-sm w-full sm:w-64 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
+                  className="border border-input rounded-md pl-9 pr-3 py-2 text-sm w-full sm:w-64 bg-card focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
             </div>
             <button
               onClick={() => exportOrdersCSV(filteredOrders)}
               disabled={filteredOrders.length === 0}
-              className="flex items-center gap-2 bg-[#111827] hover:bg-gray-800 disabled:bg-gray-300 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+              className="flex items-center gap-2 bg-primary hover:bg-primary/90 disabled:bg-border text-primary-foreground px-4 py-2 rounded-md text-sm font-medium transition-colors"
             >
               <Download className="w-4 h-4" /> Export CSV ({filteredOrders.length})
             </button>
@@ -106,7 +106,7 @@ const Orders = () => {
           {filteredOrders.length === 0 ? <p className="p-10">No orders found.</p> : (
             <>
               {filteredOrders.map((order: Order) => (
-                <div key={order.id} className="bg-white shadow-lg rounded-lg p-6 mb-6">
+                <div key={order.id} className="bg-card shadow-lift rounded-lg p-6 mb-6">
                   <div className="flex justify-between items-start flex-wrap gap-4">
                     <div>
                       <p><strong>Order ID:</strong> {order.id}</p>
@@ -152,11 +152,11 @@ const Orders = () => {
       )}
       {deleteConfirm.open && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50" onClick={() => setDeleteConfirm({ open: false, id: null })}>
-          <div className="bg-white p-6 rounded shadow-lg text-center max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-card p-6 rounded shadow-lift text-center max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-4">Are you sure you want to delete this order?</h3>
             <div className="flex justify-center gap-4">
               <button onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Yes, Delete</button>
-              <button onClick={() => setDeleteConfirm({ open: false, id: null })} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
+              <button onClick={() => setDeleteConfirm({ open: false, id: null })} className="bg-border px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
             </div>
           </div>
         </div>

@@ -12,6 +12,7 @@ months away, start here. Everything you need is in this file.
 | Storefront | https://shop-mate-six-azure.vercel.app | `shop-mate` | `frontend/` |
 | Admin dashboard | https://shop-dashboard-tan.vercel.app | `shop-dashboard` | `ecommerce-dashboard-template/` |
 | Backend API | https://shop-mate-backend.vercel.app | `shop-mate-backend` | `FULL-STACK-ECOMMERCE-AI-BASED-WEB-APPLICATION-BACKEND-CODE/` |
+| API Docs | https://shop-mate-backend.vercel.app/api/v1/docs | `shop-mate-backend` | served by the backend (Swagger UI) |
 | Database | Neon PostgreSQL 17 (project `ep-green-glitter-abnrioso`, database `shopmate`) | — | — |
 | Source code | https://github.com/George-Daniel-01/ShopMate | — | — |
 | DB backups | https://github.com/George-Daniel-01/ShopMate-backups (private) | — | — |
@@ -207,3 +208,22 @@ Typecheck everything: `npm run build` in each folder (CI does the same).
   `shopmate` database.
 - Local `config/config.env` does not exist — create it from `.env.example`
   before running the backend locally.
+
+## Deploying from the CLI
+
+Both Vercel projects have a **Root Directory** set (`frontend` and `ecommerce-dashboard-template`), so `vercel --prod` from *inside* the subfolder fails with a double-path error. To deploy from the CLI:
+
+1. Ensure the app's `.vercel` link points at the right project (`frontend/.vercel` → `shop-mate`, `ecommerce-dashboard-template/.vercel` → `shop-dashboard`).
+2. Copy the app folder's `.vercel` to the repo root, then run `vercel --prod --yes` from `D:/code/ShopMate`.
+3. After deploying, delete the root `.vercel` and `.env.local` again so each app keeps its own link (the CLI regenerates `.env.local` on every deploy; it is gitignored so leaving it is harmless).
+4. If a deploy fails, the copied root `.vercel` is left in place - just re-run `vercel --prod --yes` to retry, then clean up.
+
+For example:
+
+```bash
+# Storefront
+rm -rf .vercel && cp -r frontend/.vercel . && vercel --prod --yes && rm -rf .vercel
+
+# Dashboard
+rm -rf .vercel && cp -r ecommerce-dashboard-template/.vercel . && vercel --prod --yes && rm -rf .vercel
+```

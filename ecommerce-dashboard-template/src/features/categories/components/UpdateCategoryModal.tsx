@@ -57,20 +57,20 @@ const UpdateCategoryModal = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center p-4" onPaste={handlePaste}>
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm w-full max-w-md p-6 relative">
-        <button onClick={() => dispatch(toggleUpdateCategoryModal())} className="absolute top-4 right-4 text-gray-600 hover:text-red-500 text-xl">&times;</button>
+      <div className="bg-card rounded-lg border border-border shadow-sm w-full max-w-md p-6 relative">
+        <button onClick={() => dispatch(toggleUpdateCategoryModal())} className="absolute top-4 right-4 text-muted-foreground hover:text-red-500 text-xl">&times;</button>
         <h2 className="text-2xl font-bold mb-4 text-center">Update Category</h2>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Category Name *</label>
+            <label className="block text-sm text-muted-foreground mb-1">Category Name *</label>
             <input type="text" placeholder="e.g. Electronics" value={name} onChange={(e) => setName(e.target.value)} className="w-full border px-4 py-2 rounded" required />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Category Image</label>
-            <div className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center hover:border-gray-400 transition-colors">
-              <p className="text-gray-500 text-sm mb-2">Paste (Ctrl+V) - Drag & Drop - or Choose File</p>
+            <label className="block text-sm text-muted-foreground mb-1">Category Image</label>
+            <div className="border-2 border-dashed border-input rounded-md p-4 text-center hover:border-gray-400 transition-colors">
+              <p className="text-muted-foreground text-sm mb-2">Paste (Ctrl+V) - Drag & Drop - or Choose File</p>
               <input type="file" accept="image/*" onChange={(e) => addImage(Array.from(e.target.files ?? []))} className="hidden" id="categoryUpdateFileInput" />
-              <label htmlFor="categoryUpdateFileInput" className="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded cursor-pointer text-sm">Choose File</label>
+              <label htmlFor="categoryUpdateFileInput" className="bg-muted hover:bg-muted px-4 py-2 rounded cursor-pointer text-sm">Choose File</label>
             </div>
             {preview && (
               <div className="flex gap-2 mt-2 flex-wrap">

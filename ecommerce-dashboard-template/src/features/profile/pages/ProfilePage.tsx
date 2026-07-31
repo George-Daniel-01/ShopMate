@@ -35,40 +35,40 @@ const Profile = () => {
   };
 
   return (
-    <main className="p-[10px] pl-[10px] md:pl-[17rem] w-full">
+    <main className="p-4 pl-4 md:pl-[17rem] w-full">
       <div className="flex-1 md:p-6 mb:pb-0">
         <Header />
         <h1 className="text-2xl font-bold">Profile</h1>
-        <p className="text-sm text-gray-600 mb-6">Manage your profile.</p>
+        <p className="text-sm text-muted-foreground mb-6">Manage your profile.</p>
       </div>
       <div className="max-w-4xl md:px-4 py-8">
-        <div className="bg-white shadow-md rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6 mb-10">
+        <div className="bg-card shadow-card rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6 mb-10">
           <img src={user?.avatar?.url || avatarImg} alt={user?.name || "avatar"} className="w-32 h-32 rounded-full object-cover border" />
           <div>
             <p className="text-xl font-medium">Name: {user?.name}</p>
-            <p className="text-md text-gray-600">Email: {user?.email}</p>
-            <p className="text-sm text-gray-500">Role: {user?.role}</p>
+            <p className="text-md text-muted-foreground">Email: {user?.email}</p>
+            <p className="text-sm text-muted-foreground">Role: {user?.role}</p>
           </div>
         </div>
-        <div className="bg-gray-100 p-6 rounded-2xl shadow-md mb-10">
+        <div className="bg-muted p-6 rounded-2xl shadow-card mb-10">
           <h3 className="text-xl font-semibold mb-4">Update Profile</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input type="text" name="name" value={editData.name} onChange={(e) => setEditData({ ...editData, name: e.target.value })} className="p-2 border rounded-md" placeholder="Your Name" />
             <input type="email" name="email" value={editData.email} onChange={(e) => setEditData({ ...editData, email: e.target.value })} className="p-2 border rounded-md" placeholder="Your Email" />
             <input type="file" name="avatar" onChange={handleAvatarChange} className="p-2 border rounded-md col-span-1 md:col-span-2" />
           </div>
-          <button onClick={updateProfile} className="flex justify-center items-center gap-2 rounded-md bg-[#111827] hover:bg-gray-800 text-white font-semibold py-2.5 px-6 mt-4 text-sm" disabled={loading}>
+          <button onClick={updateProfile} className="flex justify-center items-center gap-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-2.5 px-6 mt-4 text-sm" disabled={loading}>
             {loading && updatingSection === "Profile" ? (<><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>Updating...</span></>) : "Update Profile"}
           </button>
         </div>
-        <div className="bg-gray-100 p-6 rounded-2xl shadow-md">
+        <div className="bg-muted p-6 rounded-2xl shadow-card">
           <h3 className="text-xl font-semibold mb-4">Update Password</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input type="password" name="currentPassword" value={passwordData.currentPassword} onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })} className="p-2 border rounded-md" placeholder="Current Password" />
             <input type="password" name="newPassword" value={passwordData.newPassword} onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })} className="p-2 border rounded-md" placeholder="New Password" />
             <input type="password" name="confirmNewPassword" value={passwordData.confirmNewPassword} onChange={(e) => setPasswordData({ ...passwordData, confirmNewPassword: e.target.value })} className="p-2 border rounded-md" placeholder="Confirm New Password" />
           </div>
-          <button onClick={updatePassword} className="flex justify-center items-center gap-2 rounded-md bg-[#111827] hover:bg-gray-800 text-white font-semibold py-2.5 px-6 mt-4 text-sm" disabled={loading}>
+          <button onClick={updatePassword} className="flex justify-center items-center gap-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-2.5 px-6 mt-4 text-sm" disabled={loading}>
             {loading && updatingSection === "Password" ? (<><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>Updating...</span></>) : "Update Password"}
           </button>
         </div>

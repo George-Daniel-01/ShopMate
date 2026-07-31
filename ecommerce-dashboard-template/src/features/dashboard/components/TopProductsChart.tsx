@@ -15,7 +15,7 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length > 0) {
     const product = payload[0].payload;
     return (
-      <div className="bg-white p-2 rounded shadow border text-sm">
+      <div className="bg-card p-2 rounded shadow border text-sm">
         <p className="font-semibold">Title: {product.name}</p>
         <p>Sold: {product.total_sold}</p>
       </div>
@@ -28,7 +28,7 @@ const TopProductsChart = () => {
   const { topSellingProducts } = useAppSelector((state) => state.admin);
 
   return (
-    <div className="bg-white p-4 rounded-xl shadow-md">
+    <div className="bg-card p-4 rounded-xl shadow-card">
       <h3 className="font-semibold mb-2">Top Selling Products</h3>
       <ResponsiveContainer width="100%" height={250}>
         <BarChart layout="vertical" data={topSellingProducts?.slice(0, 3)} margin={{ top: 0, right: 0, bottom: 0, left: 0 }} barSize={50}>
