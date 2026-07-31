@@ -17,24 +17,27 @@ export async function createUserTable() {
     `;
     await database.query(query);
 
-    const migrations = [
-      `CREATE EXTENSION IF NOT EXISTS pgcrypto`,
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255) NOT NULL DEFAULT 'temp_password'`,
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(10) DEFAULT 'User'`,
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar JSONB DEFAULT NULL`,
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_token TEXT DEFAULT NULL`,
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_expire TIMESTAMP DEFAULT NULL`,
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
-    ];
-    try { await database.query(`ALTER TABLE users RENAME COLUMN uuid TO id`); } catch { }
-    try { await database.query(`ALTER TABLE users ALTER COLUMN id SET DEFAULT gen_random_uuid()`); } catch { }
-    try { await database.query(`ALTER TABLE users ALTER COLUMN id SET NOT NULL`); } catch { }
-    try { await database.query(`ALTER TABLE users ALTER COLUMN uuid SET DEFAULT gen_random_uuid()`); } catch { }
-    for (const m of migrations) {
+    const ensure = async (sql: string) => {
       try {
-        await database.query(m);
-      } catch { }
-    }
+        await database.query(sql);
+      } catch {
+        // best-effort migration, failures are non-fatal
+      }
+    };
+
+    await ensure(`CREATE EXTENSION IF NOT EXISTS pgcrypto`);
+    await ensure(`ALTER TABLE users RENAME COLUMN uuid TO id`);
+    await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS id UUID`);
+    await ensure(`UPDATE users SET id = gen_random_uuid() WHERE id IS NULL`);
+    await ensure(`ALTER TABLE users ALTER COLUMN id SET NOT NULL`);
+    await ensure(`ALTER TABLE users ALTER COLUMN id SET DEFAULT gen_random_uuid()`);
+    await ensure(`ALTER TABLE users ADD CONSTRAINT users_id_unique UNIQUE (id)`);
+    await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255) NOT NULL DEFAULT 'temp_password'`);
+    await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(10) DEFAULT 'User'`);
+    await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar JSONB DEFAULT NULL`);
+    await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_token TEXT DEFAULT NULL`);
+    await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_expire TIMESTAMP DEFAULT NULL`);
+    await ensure(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
 
     console.log("✅ Users table created or already exists");
   } catch (error) {
