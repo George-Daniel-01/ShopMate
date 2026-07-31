@@ -1,15 +1,15 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
+import { toast } from "react-toastify";
 import {
+  Github,
   Mail,
   Phone,
   MapPin,
-  Facebook,
-  Twitter,
-  Instagram,
-  Youtube,
 } from "lucide-react";
 
 const Footer = () => {
+  const [email, setEmail] = useState("");
   const footerLinks = {
     company: [
       { name: "About Us", path: "/about" },
@@ -32,10 +32,8 @@ const Footer = () => {
   };
 
   const socialLinks = [
-    { icon: Facebook, href: "#", label: "Facebook" },
-    { icon: Twitter, href: "#", label: "Twitter" },
-    { icon: Instagram, href: "#", label: "Instagram" },
-    { icon: Youtube, href: "#", label: "YouTube" },
+    { icon: Github, href: "https://github.com/George-Daniel-01", label: "GitHub" },
+    { icon: Mail, href: "mailto:georgeabiamakadaniel@gmail.com", label: "Email" },
   ];
 
   return (
@@ -135,10 +133,15 @@ const Footer = () => {
               Subscribe to our newsletter for exclusive offers and updates
             </p>
           </div>
-          <form className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
+          <form
+              onSubmit={(e) => { e.preventDefault(); toast.success("Subscribed! Watch your inbox."); setEmail(""); }}
+              className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto"
+            >
             <input
               type="email"
               placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="flex-1 px-4 py-3 bg-secondary border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground placeholder-muted-foreground"
             />
             <button

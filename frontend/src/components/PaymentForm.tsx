@@ -1,10 +1,10 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { CreditCard, Lock } from "lucide-react";
 import { toast } from "react-toastify";
-import { toggleOrderStep } from "../store/slices/orderSlice";
+import { resetOrderState } from "../store/slices/orderSlice";
 import { clearCart } from "../store/slices/cartSlice";
 
 const PaymentForm = () => {
@@ -40,12 +40,12 @@ const PaymentForm = () => {
       setErrorMessage(error.message ?? "Payment failed");
     } else if (paymentIntent && paymentIntent.status === "succeeded") {
       toast.success("Payment Successful.");
-      navigateTo("/");
+      dispatch(clearCart());
+      dispatch(resetOrderState());
+      navigateTo("/orders");
     }
 
     setIsProcessing(false);
-    dispatch(toggleOrderStep());
-    dispatch(clearCart());
   };
 
   return (

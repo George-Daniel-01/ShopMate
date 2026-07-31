@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Download, Search } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import Header from "./Header";
@@ -76,7 +76,7 @@ const Orders = () => {
         <p className="text-sm text-gray-600 mb-6">Manage all your orders.</p>
       </div>
       {loading ? (
-        <div className="w-40 h-40 mx-auto border-2 border-white border-t-transparent rounded-full animate-spin" />
+        <div className="w-40 h-40 mx-auto border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
       ) : (
         <>
           <div className="flex flex-wrap justify-between items-center gap-3 p-6">

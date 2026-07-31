@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { toast } from "react-toastify";
 import { Mail, Phone, MapPin, Send } from "lucide-react";
 
@@ -12,7 +12,12 @@ const Contact = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Message sent successfully!");
+    const subject = encodeURIComponent(formData.subject || `Message from ${formData.name}`);
+    const body = encodeURIComponent(`${formData.message}
+
+— ${formData.name} (${formData.email})`);
+    window.location.href = `mailto:georgeabiamakadaniel@gmail.com?subject=${subject}&body=${body}`;
+    toast.success("Opening your email app…");
     setFormData({ name: "", email: "", subject: "", message: "" });
   };
 
@@ -37,7 +42,7 @@ const Contact = () => {
               </div>
               <div>
                 <h3 className="font-semibold text-foreground mb-1">Email</h3>
-                <p className="text-muted-foreground">hello@shopmate.com</p>
+                <p className="text-muted-foreground">georgeabiamakadaniel@gmail.com</p>
               </div>
             </div>
 
@@ -47,7 +52,7 @@ const Contact = () => {
               </div>
               <div>
                 <h3 className="font-semibold text-foreground mb-1">Phone</h3>
-                <p className="text-muted-foreground">+1 (555) 123-4567</p>
+                <p className="text-muted-foreground">07060512564</p>
               </div>
             </div>
 
@@ -57,9 +62,7 @@ const Contact = () => {
               </div>
               <div>
                 <h3 className="font-semibold text-foreground mb-1">Address</h3>
-                <p className="text-muted-foreground">
-                  123 Shop Street, City, ST 12345
-                </p>
+                <p className="text-muted-foreground">Lagos, Nigeria</p>
               </div>
             </div>
           </div>

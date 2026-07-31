@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { LayoutDashboard, ListOrdered, Package, Tags, Users, User, LogOut, MoveLeft } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { logout } from "../store/slices/authSlice";
@@ -39,7 +39,7 @@ const SideBar = () => {
           </button>
         ))}
       </nav>
-      <button onClick={() => dispatch(logout())} className="text-white rounded-md cursor-pointer flex items-center px-3 py-2 gap-2 bg-red-gradient">
+      <button onClick={() => dispatch(logout())} className="text-white rounded-md cursor-pointer flex items-center px-3 py-2 gap-2 bg-red-500 hover:bg-red-600">
         <LogOut /> Logout
       </button>
     </aside>

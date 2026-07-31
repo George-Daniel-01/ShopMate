@@ -1,4 +1,4 @@
-﻿import { X, Plus, Minus, Trash2, Truck } from "lucide-react";
+import { X, Plus, Minus, Trash2, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
@@ -7,7 +7,7 @@ import {
 } from "../../store/slices/cartSlice";
 import { toggleCart } from "../../store/slices/popupSlice";
 
-const FREE_SHIPPING_THRESHOLD = 100;
+const FREE_SHIPPING_THRESHOLD = 50;
 
 const CartSidebar = () => {
   const dispatch = useAppDispatch();

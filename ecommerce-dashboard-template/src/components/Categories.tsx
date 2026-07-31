@@ -72,7 +72,7 @@ const Categories = () => {
           </div>
           <div className="p-4 sm:p-8 bg-gray-50 min-h-screen">
             {loading ? (
-              <div className="w-40 h-40 mx-auto border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-40 h-40 mx-auto border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
             ) : visibleCategories.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {visibleCategories.map((category) => (

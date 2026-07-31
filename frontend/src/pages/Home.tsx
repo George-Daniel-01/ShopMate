@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from "react";
+import React, { useEffect } from "react";
 import HeroSlider from "../components/Home/HeroSlider";
 import CategoryGrid from "../components/Home/CategoryGrid";
 import ProductSlider from "../components/Home/ProductSlider";
@@ -6,8 +6,9 @@ import FeatureSection from "../components/Home/FeatureSection";
 import TestimonialsSection from "../components/Home/TestimonialsSection";
 import StatsBar from "../components/Home/StatsBar";
 import NewsletterSection from "../components/Home/NewsletterSection";
-import { useAppSelector, useAppDispatch } from "../store/hooks";
 import { fetchAllProducts } from "../store/slices/productSlice";
+import { useAppSelector, useAppDispatch } from "../store/hooks";
+
 
 const Index = () => {
   const dispatch = useAppDispatch();

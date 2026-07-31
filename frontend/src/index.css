@@ -3,7 +3,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Cal.diy design system — tokens ported from packages/config/theme/tokens.css */
+/* ShopMate design tokens */
 
 @layer base {
   :root {
@@ -113,6 +113,20 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  ::selection {
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
   * {
     @apply border-border;
   }
@@ -238,5 +252,18 @@
 
   .animate-fade-in-up {
     animation: fadeInUp 0.6s ease-out;
+  }
+
+  @keyframes kenBurns {
+    from {
+      transform: scale(1);
+    }
+    to {
+      transform: scale(1.08);
+    }
+  }
+
+  .animate-ken-burns {
+    animation: kenBurns 10s ease-out forwards;
   }
 }

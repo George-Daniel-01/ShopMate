@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { ArrowLeft, Check } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
@@ -357,7 +357,7 @@ const Payment = (): React.JSX.Element | null => {
                       <span className="text-muted-foreground">Shipping</span>
                       <span
                         className={`${
-                          totalWithTax >= 50 ? "text-green-500" : ""
+                          total >= 50 ? "text-green-500" : ""
                         }`}
                       >
                         {total >= 50 ? "Free" : "$2"}

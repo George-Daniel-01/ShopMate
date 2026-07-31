@@ -1,4 +1,4 @@
-﻿import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { toast } from "react-toastify";
 import type { CartItem, CartState, Product } from "../../types/index";
 
@@ -59,7 +59,6 @@ const cartSlice = createSlice({
     clearCart(state) {
       state.cart = [];
       localStorage.removeItem(STORAGE_KEY);
-      toast.info("Cart cleared");
     },
   },
 });

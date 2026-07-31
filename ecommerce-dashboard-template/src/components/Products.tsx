@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { LoaderCircle, Plus, Search, AlertTriangle } from "lucide-react";
 import CreateProductModal from "../modals/CreateProductModal";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
@@ -103,7 +103,7 @@ const Products = () => {
             >
               {loading ? (
                 // Full-table spinner only on initial/page fetch
-                <div className="w-40 h-40 mx-auto border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-40 h-40 mx-auto border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
               ) : products && products.length > 0 ? (
                 <table className="min-w-full bg-white border border-gray-200">
                   <thead className="bg-gray-100 text-gray-700">
@@ -120,7 +120,7 @@ const Products = () => {
                   <tbody>
                     {visibleProducts.map((product: Product, index: number) => (
                       <tr
-                        key={index}
+                        key={product.id}
                         className="border-t hover:bg-gray-50 cursor-pointer"
                         onClick={() => {
                           setSelectedProduct(product);

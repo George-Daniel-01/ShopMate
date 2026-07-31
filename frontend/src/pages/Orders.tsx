@@ -1,11 +1,14 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Filter, Package, Truck, CheckCircle, XCircle } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { Link, useNavigate } from "react-router-dom";
-import { fetchMyOrders } from "../store/slices/orderSlice";
+import { fetchMyOrders, cancelOrder } from "../store/slices/orderSlice";
+import { addToCart } from "../store/slices/cartSlice";
+import { toast } from "react-toastify";
 
 const Orders = (): React.JSX.Element | null => {
   const [statusFilter, setStatusFilter] = useState("All");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const { myOrders } = useAppSelector((state) => state.order);
   const dispatch = useAppDispatch();
 
@@ -21,6 +24,32 @@ const Orders = (): React.JSX.Element | null => {
     // Cleanup interval when user leaves the page
     return () => clearInterval(interval);
   }, [dispatch]);
+
+  const handleReorder = (order: import("../types/index").Order) => {
+    order?.order_items?.forEach((item) => {
+      dispatch(addToCart({
+        product: {
+          id: item.product_id,
+          name: item.title,
+          description: "",
+          price: Number(item.price),
+          category: "",
+          ratings: 0,
+          images: item.image ? [{ url: item.image, public_id: "" }] : [],
+          stock: 999,
+          created_by: "",
+          created_at: new Date().toISOString(),
+        },
+        quantity: item.quantity,
+      }));
+    });
+    toast.success("Items added back to your cart");
+    navigateTo("/cart");
+  };
+
+  const handleCancelOrder = (orderId: string) => {
+    dispatch(cancelOrder(orderId));
+  };
 
   const filterOrders = myOrders.filter(
     (order) => statusFilter === "All" || order.order_status === statusFilter
@@ -189,11 +218,11 @@ const Orders = (): React.JSX.Element | null => {
 
                     {/* ORDER ACTIONS */}
                     <div className="flex flex-wrap gap-3 mt-6 pt-6 border-t border-[hsla(var(--glass-border))]">
-                      <button className="px-4 py-2 glass-card hover:glow-on-hover animate-smooth text-sm">
-                        View Details
-                      </button>
-                      <button className="px-4 py-2 glass-card hover:glow-on-hover animate-smooth text-sm">
-                        Track Order
+                      <button
+                        onClick={() => setExpandedId(expandedId === order.id ? null : order.id)}
+                        className="px-4 py-2 glass-card hover:glow-on-hover animate-smooth text-sm"
+                      >
+                        {expandedId === order.id ? "Hide Details" : "View Details"}
                       </button>
                       {order.order_status === "Delivered" && (
                         <>
@@ -206,17 +235,41 @@ const Orders = (): React.JSX.Element | null => {
                               Write Review
                             </Link>
                           ))}
-                          <button className="px-4 py-2 glass-card hover:glow-on-hover animate-smooth text-sm">
+                          <button
+                            onClick={() => handleReorder(order)}
+                            className="px-4 py-2 glass-card hover:glow-on-hover animate-smooth text-sm"
+                          >
                             Reorder
                           </button>
                         </>
                       )}
                       {order.order_status === "Processing" && (
-                        <button className="px-4 py-2 glass-card hover:glow-on-hover animate-smooth text-sm text-destructive">
+                        <button
+                          onClick={() => handleCancelOrder(order.id)}
+                          className="px-4 py-2 glass-card hover:glow-on-hover animate-smooth text-sm text-destructive"
+                        >
                           Cancel Order
                         </button>
                       )}
                     </div>
+
+                    {expandedId === order.id && (
+                      <div className="mt-4 p-4 bg-secondary/50 rounded-lg">
+                        <h4 className="font-semibold text-foreground mb-2">Shipping Details</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground">
+                          <div>
+                            <p><span className="font-medium text-foreground">Name:</span> {order.shipping_info?.full_name}</p>
+                            <p><span className="font-medium text-foreground">Phone:</span> {order.shipping_info?.phone}</p>
+                            <p><span className="font-medium text-foreground">Email:</span> {order.shipping_info?.country}</p>
+                          </div>
+                          <div>
+                            <p><span className="font-medium text-foreground">Address:</span> {order.shipping_info?.address}</p>
+                            <p><span className="font-medium text-foreground">City:</span> {order.shipping_info?.city}, {order.shipping_info?.state}</p>
+                            <p><span className="font-medium text-foreground">ZIP:</span> {order.shipping_info?.pincode}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

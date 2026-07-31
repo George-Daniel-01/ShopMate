@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Mail, Send } from "lucide-react";
+import { toast } from "react-toastify";
 
 const NewsletterSection = () => {
   const [email, setEmail] = useState("");
@@ -20,7 +21,10 @@ const NewsletterSection = () => {
             deals, new arrivals, and special offers.
           </p>
 
-          <form className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
+          <form
+            onSubmit={(e) => { e.preventDefault(); toast.success("Subscribed! Check your inbox soon."); setEmail(""); }}
+            className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto"
+          >
             <div className="relative flex-1">
               <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <input

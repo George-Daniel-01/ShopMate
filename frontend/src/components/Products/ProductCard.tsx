@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { Star, ShoppingCart, Heart, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
@@ -66,11 +66,10 @@ const ProductCard = ({ product }: { product: import("../../types/index").Product
 
   return (
     <Link
-      key={product.id}
       to={`/product/${product.id}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="flex-shrink-0 w-80 bg-card border border-border rounded-md p-4 hover:shadow-[var(--shadow-elegant)] animate-smooth group flex flex-col"
+      className="w-full bg-card border border-border rounded-md p-4 hover:shadow-[var(--shadow-elegant)] animate-smooth group flex flex-col"
     >
       <div className="relative overflow-hidden rounded-md mb-4">
         <img

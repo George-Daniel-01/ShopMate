@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import avatarImg from "../assets/avatar.jpg";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import Header from "./Header";
@@ -25,7 +25,7 @@ const Users = () => {
       <div className="p-4 sm:p-8 bg-gray-50 min-h-screen">
         <div className={`overflow-x-auto rounded-lg ${loading ? "p-10 shadow-none" : `${users && users.length > 0 && "shadow-lg"}`}`}>
           {loading ? (
-            <div className="w-40 h-40 mx-auto border-2 border-white border-t-transparent rounded-full animate-spin" />
+            <div className="w-40 h-40 mx-auto border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
           ) : users && users.length > 0 ? (
             <table className="min-w-full bg-white border border-gray-200">
               <thead className="bg-gray-100 text-gray-700">
@@ -39,13 +39,13 @@ const Users = () => {
               </thead>
               <tbody>
                 {users.map((user: User, index: number) => (
-                  <tr key={index} className="border-t hover:bg-gray-50">
+                  <tr key={user.id} className="border-t hover:bg-gray-50">
                     <td className="py-3 px-4"><img src={user?.avatar?.url || avatarImg} alt="avatar" className="w-10 h-10 rounded-full object-cover" /></td>
                     <td className="px-3 py-4">{user.name}</td>
                     <td className="px-3 py-4">{user.email}</td>
                     <td className="px-3 py-4">{new Date(user.created_at).toLocaleDateString()}</td>
                     <td className="px-3 py-4">
-                      <button onClick={() => dispatch(deleteUser(user.id, page))} className="text-white rounded-md cursor-pointer px-3 py-2 font-semibold bg-red-gradient hover:opacity-90">Delete</button>
+                      <button onClick={() => dispatch(deleteUser(user.id, page))} className="text-white rounded-md cursor-pointer px-3 py-2 font-semibold bg-red-500 hover:bg-red-600">Delete</button>
                     </td>
                   </tr>
                 ))}

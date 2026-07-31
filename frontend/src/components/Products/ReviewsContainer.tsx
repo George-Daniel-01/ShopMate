@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { postReview, deleteReview } from "../../store/slices/productSlice";
 import { Star } from "lucide-react";
@@ -117,7 +117,7 @@ const ReviewsContainer = ({ product, productReviews }: { product: import("../../
                     >
                       {isReviewDeleting ? (
                         <>
-                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
                           <span>Deleting Review...</span>
                         </>
                       ) : (

@@ -1,4 +1,4 @@
-﻿import { Request, Response, NextFunction } from "express";
+import { Request, Response, NextFunction } from "express";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
 import { database } from "../database/db.js";
@@ -175,6 +175,20 @@ export const updateOrderStatus = catchAsyncErrors(
       `UPDATE orders SET order_status = $1 WHERE id = $2 RETURNING *`, [status, orderId]
     );
     res.status(200).json({ success: true, message: "Order status updated.", updatedOrder: updatedOrder.rows[0] });
+  }
+);
+
+export const cancelOrder = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { orderId } = req.params;
+    const results = await database.query(`SELECT * FROM orders WHERE id = $1 AND buyer_id = $2`, [orderId, req.user.id]);
+    if (results.rows.length === 0) return next(new ErrorHandler("Order not found.", 404));
+    if (results.rows[0].order_status !== "Processing")
+      return next(new ErrorHandler("Only orders in Processing status can be cancelled.", 400));
+    const cancelled = await database.query(
+      `UPDATE orders SET order_status = $1 WHERE id = $2 RETURNING *`, ["Cancelled", orderId]
+    );
+    res.status(200).json({ success: true, message: "Order cancelled successfully.", updatedOrder: cancelled.rows[0] });
   }
 );
 

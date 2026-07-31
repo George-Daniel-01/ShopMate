@@ -1,4 +1,4 @@
-﻿import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { axiosInstance } from "../../lib/axios";
 import { toast } from "react-toastify";
 import type { Order, OrderState } from "../../types/index";
@@ -11,6 +11,20 @@ export const fetchMyOrders = createAsyncThunk<Order[]>("order/fetchMyOrders", as
     return thunkAPI.rejectWithValue(error.response?.data?.message);
   }
 });
+
+export const cancelOrder = createAsyncThunk<{ updatedOrder: Order }, string>(
+  "order/cancelOrder",
+  async (orderId, thunkAPI) => {
+    try {
+      const res = await axiosInstance.put(`/order/cancel/${orderId}`);
+      toast.success(res.data.message);
+      return res.data;
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to cancel order");
+      return thunkAPI.rejectWithValue(error.response?.data?.message);
+    }
+  }
+);
 
 export const placeOrder = createAsyncThunk<{ total_price: number; paymentIntent: string; orderId: string }, FormData>(
   "order/placeOrder",
@@ -47,6 +61,14 @@ const orderSlice = createSlice({
       .addCase(fetchMyOrders.pending, (state) => { state.fetchingOrders = true; })
       .addCase(fetchMyOrders.fulfilled, (state, action) => { state.fetchingOrders = false; state.myOrders = action.payload; })
       .addCase(fetchMyOrders.rejected, (state) => { state.fetchingOrders = false; })
+      .addCase(cancelOrder.pending, (state) => { state.fetchingOrders = true; })
+      .addCase(cancelOrder.fulfilled, (state, action) => {
+        state.fetchingOrders = false;
+        const updated = action.payload.updatedOrder;
+        const index = state.myOrders.findIndex((o) => o.id === updated.id);
+        if (index !== -1) state.myOrders[index] = updated;
+      })
+      .addCase(cancelOrder.rejected, (state) => { state.fetchingOrders = false; })
       .addCase(placeOrder.pending, (state) => { state.placingOrder = true; })
       .addCase(placeOrder.fulfilled, (state, action) => {
         state.placingOrder = false;

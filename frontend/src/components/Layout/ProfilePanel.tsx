@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { X, LogOut, Upload, Eye, EyeOff } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { toast } from "react-toastify";
@@ -141,7 +141,7 @@ const ProfilePanel = () => {
             >
               {isUpdatingProfile ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
                   <span>Updating Profile...</span>
                 </>
               ) : (
@@ -194,7 +194,7 @@ const ProfilePanel = () => {
             >
               {isUpdatingPassword ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
                   <span>Updating Password...</span>
                 </>
               ) : (
