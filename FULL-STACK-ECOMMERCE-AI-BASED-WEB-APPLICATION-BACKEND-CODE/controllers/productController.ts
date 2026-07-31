@@ -52,6 +52,14 @@ export const createProduct = catchAsyncErrors(
           uploadedImages.push(DEFAULT_IMAGE);
         }
       }
+    } else if (req.body.imageUrls) {
+      let urls: string[] = [];
+      try {
+        urls = JSON.parse(req.body.imageUrls as string);
+      } catch {
+        urls = String(req.body.imageUrls).split(",").map((u) => u.trim()).filter(Boolean);
+      }
+      for (const url of urls) uploadedImages.push({ url, public_id: "" });
     }
     if (uploadedImages.length === 0) uploadedImages.push(DEFAULT_IMAGE);
 
