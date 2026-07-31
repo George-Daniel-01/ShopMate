@@ -239,27 +239,93 @@ export const aiSearchProducts = catchAsyncErrors(
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     if (!nvidiaKey && !openRouterKey) return next(new ErrorHandler("AI search is not configured.", 503));
 
-    const systemPrompt = `You are a product search assistant for an e-commerce store. Extract structured search parameters from the user's natural language query.
-Return ONLY a valid JSON object (no markdown, no backticks, no extra text) with these optional fields:
-- "search": string (product name or description keywords, or null)
-- "category": string (product category, or null)
-- "minPrice": number (minimum price in dollars, or null)
-- "maxPrice": number (maximum price in dollars, or null)
+    // -------- helpers -------------------------------------------------
+    const CATEGORIES = [
+      "Electronics", "Fashion", "Home & Garden", "Sports",
+      "Books", "Beauty", "Automotive", "Kids & Baby",
+    ];
+    const CATEGORY_KEYWORDS: Record<string, string> = {
+      electronics: "Electronics", gadget: "Electronics", gadgets: "Electronics", tech: "Electronics",
+      phone: "Electronics", smartphone: "Electronics", laptop: "Electronics", computer: "Electronics",
+      camera: "Electronics", headphone: "Electronics", headphones: "Electronics",
+      fashion: "Fashion", clothes: "Fashion", clothing: "Fashion", dress: "Fashion", shirt: "Fashion",
+      shoes: "Fashion", sneakers: "Fashion", watch: "Fashion", jacket: "Fashion",
+      home: "Home & Garden", garden: "Home & Garden", furniture: "Home & Garden", decor: "Home & Garden",
+      lamp: "Home & Garden", armchair: "Home & Garden",
+      sports: "Sports", fitness: "Sports", gym: "Sports", bike: "Sports", running: "Sports",
+      dumbbell: "Sports",
+      books: "Books", book: "Books", novel: "Books", literature: "Books",
+      beauty: "Beauty", skincare: "Beauty", perfume: "Beauty", makeup: "Beauty", cosmetics: "Beauty",
+      automotive: "Automotive", car: "Automotive", auto: "Automotive", vehicle: "Automotive",
+      toys: "Kids & Baby", toy: "Kids & Baby", baby: "Kids & Baby", kids: "Kids & Baby",
+    };
+    const STOPWORDS = new Set([
+      "show", "give", "want", "need", "find", "get", "some", "with", "the", "for", "under",
+      "over", "less", "more", "than", "cheap", "expensive", "affordable", "budget", "premium",
+      "luxury", "items", "item", "products", "product", "me", "my", "a", "an", "and", "or", "please",
+    ]);
+    const tokenize = (phrase: string | null): string[] => {
+      if (!phrase) return [];
+      return phrase
+        .split(/[^a-zA-Z0-9&'-]+/)
+        .map((w) => w.trim())
+        .filter((w) => w.length > 2)
+        .filter((w) => !STOPWORDS.has(w.toLowerCase()));
+    };
+    const detectCategory = (text: string | null): string | null => {
+      if (!text) return null;
+      const lower = text.toLowerCase();
+      for (const [keyword, category] of Object.entries(CATEGORY_KEYWORDS)) {
+        if (lower.includes(keyword)) return category;
+      }
+      return null;
+    };
+    const parseAiJson = (raw: string): Record<string, any> => {
+      const cleaned = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+      try {
+        return JSON.parse(cleaned);
+      } catch {
+        const start = cleaned.lastIndexOf("{");
+        const end = cleaned.lastIndexOf("}");
+        if (start >= 0 && end > start) return JSON.parse(cleaned.slice(start, end + 1));
+        throw new Error("AI returned an invalid response format.");
+      }
+    };
+
+    const systemPrompt = `You are a product search assistant for the ShopMate e-commerce store. From the user's query, extract structured search parameters.
+
+The store's categories are: ${CATEGORIES.join(", ")}.
+
+Return ONLY a valid JSON object (no markdown, no backticks, no reasoning or explanation, no extra text) with these optional fields:
+- "search": string (specific product name or description keywords, or null). Never put category words here.
+- "category": string (an exact category from the list above, or null)
+- "minPrice": number (only when the query states an explicit minimum like "over $500" or "more than $100"; otherwise null)
+- "maxPrice": number (only when the query states an explicit maximum like "under $100" or "less than $50"; otherwise null)
+
+Rules:
+- Category words (electronics, gadgets, tech, fashion, clothes, shoes, sneakers, books, beauty, toys, baby, sports, garden, automotive, car, etc.) go into "category" with the exact store category name — never into "search".
+- Only set minPrice/maxPrice when an explicit number appears in the query. Subjective words like "cheap", "expensive", "affordable", "luxury", "budget" do NOT create price bounds.
 
 Examples:
 Input: "show me affordable running shoes under $100"
 Output: {"search": "running shoes", "category": null, "minPrice": null, "maxPrice": 100}
 
 Input: "expensive electronics"
-Output: {"search": null, "category": "electronics", "minPrice": 200, "maxPrice": null}
+Output: {"search": null, "category": "Electronics", "minPrice": null, "maxPrice": null}
+
+Input: "fashion items"
+Output: {"search": null, "category": "Fashion", "minPrice": null, "maxPrice": null}
 
 Input: "trendy sneakers"
-Output: {"search": "sneakers", "category": null, "minPrice": null, "maxPrice": null}`;
+Output: {"search": "sneakers", "category": null, "minPrice": null, "maxPrice": null}
+
+Input: "a book cheaper than $30"
+Output: {"search": null, "category": "Books", "minPrice": null, "maxPrice": 30}`;
 
     let params: { search: string | null; category: string | null; minPrice: number | null; maxPrice: number | null };
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+      const timeout = setTimeout(() => controller.abort(), 25000);
       const provider = nvidiaKey
         ? { base: "https://integrate.api.nvidia.com/v1", key: nvidiaKey, model: "nvidia/nemotron-3-ultra-550b-a55b" }
         : { base: "https://openrouter.ai/api/v1", key: openRouterKey, model: "openai/gpt-4o-mini" };
@@ -271,6 +337,8 @@ Output: {"search": "sneakers", "category": null, "minPrice": null, "maxPrice": n
         },
         body: JSON.stringify({
           model: provider.model,
+          temperature: 0,
+          max_tokens: 500,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
@@ -285,56 +353,87 @@ Output: {"search": "sneakers", "category": null, "minPrice": null, "maxPrice": n
       }
       const data: any = await response.json();
       const rawContent = data.choices[0].message.content;
-      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("AI returned an invalid response format.");
-      params = JSON.parse(jsonMatch[0]);
+      const parsed = parseAiJson(rawContent);
+      const toNumber = (v: any): number | null => {
+        if (typeof v === "number") return Number.isFinite(v) ? v : null;
+        if (typeof v === "string" && v.trim() !== "") {
+          const n = Number(v);
+          return Number.isFinite(n) ? n : null;
+        }
+        return null;
+      };
+      params = {
+        search: typeof parsed.search === "string" && parsed.search.trim() ? parsed.search.trim() : null,
+        category: typeof parsed.category === "string" && parsed.category.trim() ? parsed.category.trim() : null,
+        minPrice: toNumber(parsed.minPrice),
+        maxPrice: toNumber(parsed.maxPrice),
+      };
     } catch (error: any) {
       console.error("AI search fallback due to:", error.message);
       params = { search: userPrompt, category: null, minPrice: null, maxPrice: null };
     }
 
-    if (!params || typeof params !== "object") {
-      params = { search: userPrompt, category: null, minPrice: null, maxPrice: null };
-    }
+    const runSearch = async (p: typeof params, useOr: boolean) => {
+      const conditions: string[] = [];
+      const values: (string | number)[] = [];
+      let index = 1;
 
-    const conditions: string[] = [];
-    const values: (string | number)[] = [];
-    let index = 1;
+      const keywords = tokenize(p.search);
+      if (keywords.length) {
+        const parts = keywords.map(() => `(p.name ILIKE $${index} OR p.description ILIKE $${index + 1})`);
+        conditions.push(`(${parts.join(useOr ? " OR " : " AND ")})`);
+        keywords.forEach((k) => {
+          values.push(`%${k}%`, `%${k}%`);
+          index += 2;
+        });
+      }
+      if (p.category) {
+        conditions.push(`p.category ILIKE $${index}`);
+        values.push(`%${p.category}%`);
+        index++;
+      }
+      if (p.minPrice !== null && p.minPrice !== undefined) {
+        conditions.push(`p.price >= $${index}`);
+        values.push(p.minPrice);
+        index++;
+      }
+      if (p.maxPrice !== null && p.maxPrice !== undefined) {
+        conditions.push(`p.price <= $${index}`);
+        values.push(p.maxPrice);
+        index++;
+      }
 
-    if (params.search) {
-      conditions.push(`(p.name ILIKE $${index} OR p.description ILIKE $${index + 1})`);
-      values.push(`%${params.search}%`, `%${params.search}%`);
-      index += 2;
-    }
-    if (params.category) {
-      conditions.push(`p.category ILIKE $${index}`);
-      values.push(`%${params.category}%`);
-      index++;
-    }
-    if (params.minPrice !== null) {
-      conditions.push(`p.price >= $${index}`);
-      values.push(params.minPrice);
-      index++;
-    }
-    if (params.maxPrice !== null) {
-      conditions.push(`p.price <= $${index}`);
-      values.push(params.maxPrice);
-      index++;
-    }
+      const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+      const countResult = await database.query<{ count: string }>(`SELECT COUNT(*) FROM products p ${whereClause}`, values);
+      const totalProducts = parseInt(countResult.rows[0].count);
+      if (totalProducts === 0) return { totalProducts, products: [] as any[] };
 
-    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-    const countResult = await database.query<{ count: string }>(`SELECT COUNT(*) FROM products p ${whereClause}`, values);
-    const totalProducts = parseInt(countResult.rows[0].count);
+      const result = await database.query(
+        `SELECT p.*, COUNT(r.id) AS review_count FROM products p LEFT JOIN reviews r ON p.id = r.product_id ${whereClause} GROUP BY p.id ORDER BY p.created_at DESC LIMIT 50`,
+        values
+      );
+      return { totalProducts, products: result.rows.map(parseProductImages) };
+    };
 
-    const result = await database.query(
-      `SELECT p.*, COUNT(r.id) AS review_count FROM products p LEFT JOIN reviews r ON p.id = r.product_id ${whereClause} GROUP BY p.id ORDER BY p.created_at DESC LIMIT 50`,
-      values
-    );
+    // Layered relaxation so searches never silently return nothing:
+    // 1) strict (AI params) -> 2) drop invented price bounds -> 3) detect category from words -> 4) OR-matching
+    let searchResult = await runSearch(params, false);
+    if (searchResult.totalProducts === 0 && (params.minPrice !== null || params.maxPrice !== null)) {
+      searchResult = await runSearch({ ...params, minPrice: null, maxPrice: null }, false);
+    }
+    if (searchResult.totalProducts === 0 && !params.category) {
+      const detected = detectCategory(params.search) || detectCategory(userPrompt);
+      // Replace (not AND) the search terms: they matched nothing, so only the category matters.
+      if (detected) searchResult = await runSearch({ ...params, search: null, category: detected }, false);
+    }
+    if (searchResult.totalProducts === 0) {
+      searchResult = await runSearch({ ...params, minPrice: null, maxPrice: null }, true);
+    }
 
     res.status(200).json({
       success: true,
-      products: result.rows.map(parseProductImages),
-      totalProducts,
+      products: searchResult.products,
+      totalProducts: searchResult.totalProducts,
     });
   }
 );
