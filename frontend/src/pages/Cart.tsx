@@ -1,7 +1,9 @@
 import { Plus, Minus, Trash2, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { removeFromCart, updateCartQuantity } from "../store/slices/cartSlice";
+import { openAuthPopup, setPendingCheckout } from "../store/slices/popupSlice";
 
 const Cart = () => {
   const dispatch = useAppDispatch();
@@ -17,6 +19,13 @@ const Cart = () => {
     } else {
       dispatch(updateCartQuantity({ id, quantity: delta }));
     }
+  };
+
+  // Guests are prompted to sign in before checkout instead of being blocked silently
+  const handleGuestCheckout = () => {
+    dispatch(setPendingCheckout());
+    dispatch(openAuthPopup());
+    toast.info("Please sign in to continue to checkout. Your cart is saved.");
   };
 
   let total = 0;
@@ -178,18 +187,25 @@ const Cart = () => {
                   <div className="border-t border-[hsla(var(--glass-border))] pt-4">
                     <div className="flex justify-between">
                       <span className="text-lg font-semibold">Total</span>
-                      <span>${(total + total * 0.18).toFixed(2)}</span>
+                      <span>${(total + total * 0.18 + (total < 50 ? 2 : 0)).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
 
-                {authUser && (
+                {authUser ? (
                   <Link
                     to={"/payment"}
                     className="w-full block text-center py-4 gradient-primary text-primary-foreground rounded-lg hover:glow-on-hover animate-smooth font-semibold mb-4"
                   >
                     Proceed to Checkout
                   </Link>
+                ) : (
+                  <button
+                    onClick={handleGuestCheckout}
+                    className="w-full block text-center py-4 gradient-primary text-primary-foreground rounded-lg hover:glow-on-hover animate-smooth font-semibold mb-4"
+                  >
+                    Sign in to Checkout
+                  </button>
                 )}
 
                 <Link

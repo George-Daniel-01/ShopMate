@@ -1,4 +1,4 @@
-﻿export interface ProductImage {
+export interface ProductImage {
   url: string;
   public_id: string;
 }
@@ -104,6 +104,7 @@ export interface PopupState {
   isCartOpen: boolean;
   isAIPopupOpen: boolean;
   quickViewProduct: Product | null;
+  pendingCheckout: boolean;
 }
 
 export interface ProductState {

@@ -1,4 +1,4 @@
-﻿import { createSlice } from "@reduxjs/toolkit";
+import { createSlice } from "@reduxjs/toolkit";
 import type { PopupState, Product } from "../../types/index";
 
 const initialState: PopupState = {
@@ -9,6 +9,7 @@ const initialState: PopupState = {
   isCartOpen: false,
   isAIPopupOpen: false,
   quickViewProduct: null,
+  pendingCheckout: false,
 };
 
 const popupSlice = createSlice({
@@ -21,6 +22,13 @@ const popupSlice = createSlice({
     },
     openAuthPopup(state) {
       state.isAuthPopupOpen = true;
+      state.authPopupView = "login";
+    },
+    setPendingCheckout(state) {
+      state.pendingCheckout = true;
+    },
+    clearPendingCheckout(state) {
+      state.pendingCheckout = false;
     },
     setAuthPopupView(state, action) { state.authPopupView = action.payload; },
     toggleSidebar(state) { state.isSidebarOpen = !state.isSidebarOpen; },
@@ -32,5 +40,5 @@ const popupSlice = createSlice({
   },
 });
 
-export const { toggleAuthPopup, openAuthPopup, setAuthPopupView, toggleSidebar, toggleSearchBar, toggleCart, toggleAIModal, openQuickView, closeQuickView } = popupSlice.actions;
+export const { toggleAuthPopup, openAuthPopup, setAuthPopupView, setPendingCheckout, clearPendingCheckout, toggleSidebar, toggleSearchBar, toggleCart, toggleAIModal, openQuickView, closeQuickView } = popupSlice.actions;
 export default popupSlice.reducer;

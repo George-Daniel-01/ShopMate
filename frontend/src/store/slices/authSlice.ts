@@ -13,6 +13,9 @@ export const register = createAsyncThunk<User, FormData | Record<string, string>
         headers: { "Content-Type": "application/json" },
       });
       toast.success(res.data.message);
+      if (res.data.token) {
+        localStorage.setItem("token", res.data.token);
+      }
       (thunkAPI.dispatch as AppDispatch)(toggleAuthPopup());
       return res.data.user as User;
     } catch (error: any) {

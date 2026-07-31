@@ -1,7 +1,8 @@
-﻿import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Mail, Lock } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import { toggleAuthPopup, setAuthPopupView } from "../../store/slices/popupSlice";
+import { useNavigate } from "react-router-dom";
+import { toggleAuthPopup, setAuthPopupView, clearPendingCheckout } from "../../store/slices/popupSlice";
 import { login } from "../../store/slices/authSlice";
 import type { AppDispatch } from "../../store/store";
 import type { RootState } from "../../types/index";
@@ -13,6 +14,17 @@ const LoginModal = () => {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  const navigate = useNavigate();
+  const { pendingCheckout } = useSelector((state: RootState) => state.popup);
+
+  // After a successful login, resume a checkout that was blocked for guests
+  useEffect(() => {
+    if (authUser && pendingCheckout) {
+      dispatch(clearPendingCheckout());
+      navigate("/payment");
+    }
+  }, [authUser, pendingCheckout, navigate, dispatch]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

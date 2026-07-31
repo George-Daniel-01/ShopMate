@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { ArrowLeft, Check } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { Elements } from "@stripe/react-stripe-js";
 import PaymentForm from "../components/PaymentForm";
 import { loadStripe } from "@stripe/stripe-js";
 import { placeOrder } from "../store/slices/orderSlice";
+import { openAuthPopup } from "../store/slices/popupSlice";
 
 const Payment = (): React.JSX.Element | null => {
   const { authUser } = useAppSelector((state) => state.auth);
-  const navigateTo = useNavigate();
   const dispatch = useAppDispatch();
   const { cart } = useAppSelector((state) => state.cart);
   const { orderStep } = useAppSelector((state) => state.order);
@@ -23,11 +23,33 @@ const Payment = (): React.JSX.Element | null => {
     country: "Nigeria",
   });
 
-  useEffect(() => {
-    if (!authUser) navigateTo("/products");
-  }, [authUser, navigateTo]);
-
-  if (!authUser) return null;
+  if (!authUser) {
+    return (
+      <div className="min-h-screen pt-20 flex items-center justify-center">
+        <div className="text-center glass-panel max-w-md mx-4">
+          <h1 className="text-3xl font-bold text-foreground mb-4">
+            Please Sign In
+          </h1>
+          <p className="text-muted-foreground mb-8">
+            You need an account to continue to checkout. Your cart is saved &mdash;
+            sign in and you&apos;ll be taken straight back here.
+          </p>
+          <button
+            onClick={() => dispatch(openAuthPopup())}
+            className="w-full inline-flex justify-center items-center px-6 py-3 rounded-lg text-primary-foreground gradient-primary hover:glow-on-hover animate-smooth font-semibold"
+          >
+            Sign In to Checkout
+          </button>
+          <Link
+            to={"/products"}
+            className="inline-block mt-4 text-sm text-muted-foreground hover:text-primary animate-smooth"
+          >
+            Continue Shopping
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
   const stripePromise = stripeKey ? loadStripe(stripeKey) : null;

@@ -4,16 +4,22 @@ import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchMyOrders, cancelOrder } from "../store/slices/orderSlice";
 import { addToCart } from "../store/slices/cartSlice";
+import { openAuthPopup } from "../store/slices/popupSlice";
 import { toast } from "react-toastify";
 
 const Orders = (): React.JSX.Element | null => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { myOrders } = useAppSelector((state) => state.order);
+  const { authUser } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
+  const navigateTo = useNavigate();
 
   useEffect(() => {
-    // âœ… FIX: Fetch immediately on mount
+    // Only fetch orders while signed in
+    if (!authUser) return;
+
+    // Fetch immediately on mount
     dispatch(fetchMyOrders());
 
     // âœ… FIX: Auto-refresh every 30 seconds so admin status changes reflect here
@@ -23,7 +29,7 @@ const Orders = (): React.JSX.Element | null => {
 
     // Cleanup interval when user leaves the page
     return () => clearInterval(interval);
-  }, [dispatch]);
+  }, [dispatch, authUser]);
 
   const handleReorder = (order: import("../types/index").Order) => {
     order?.order_items?.forEach((item) => {
@@ -87,14 +93,26 @@ const Orders = (): React.JSX.Element | null => {
 
   const statusArray = ["All", "Processing", "Shipped", "Delivered", "Cancelled"];
 
-  const { authUser } = useAppSelector((state) => state.auth);
-  const navigateTo = useNavigate();
-
-  useEffect(() => {
-    if (!authUser) navigateTo("/products");
-  }, [authUser, navigateTo]);
-
-  if (!authUser) return null;
+  if (!authUser) {
+    return (
+      <div className="min-h-screen pt-20 flex items-center justify-center">
+        <div className="text-center glass-panel max-w-md mx-4">
+          <h1 className="text-3xl font-bold text-foreground mb-4">
+            Please Sign In
+          </h1>
+          <p className="text-muted-foreground mb-8">
+            Sign in to view your order history, track deliveries, and reorder items.
+          </p>
+          <button
+            onClick={() => dispatch(openAuthPopup())}
+            className="w-full inline-flex justify-center items-center px-6 py-3 rounded-lg text-primary-foreground gradient-primary hover:glow-on-hover animate-smooth font-semibold"
+          >
+            Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

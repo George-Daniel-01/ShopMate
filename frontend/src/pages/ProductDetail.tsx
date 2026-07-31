@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { toast } from "react-toastify";
+import { openAuthPopup, setPendingCheckout } from "../store/slices/popupSlice";
 import ReviewsContainer from "../components/Products/ReviewsContainer";
 import ProductCard from "../components/Products/ProductCard";
 import { addToCart } from "../store/slices/cartSlice";
@@ -25,6 +26,7 @@ const ProductDetail = () => {
   const product = useAppSelector((state) => state.product?.productDetails);
   const { loading, productReviews, products } = useAppSelector((state) => state.product);
   const { wishlist } = useAppSelector((state) => state.wishlist);
+  const { authUser } = useAppSelector((state) => state.auth);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState("description");
@@ -41,7 +43,14 @@ const ProductDetail = () => {
   };
 
   const handleBuyNow = () => {
+    // Add to cart first so the item is saved for a guest who signs in
     dispatch(addToCart({ product: product!, quantity }));
+    if (!authUser) {
+      dispatch(setPendingCheckout());
+      dispatch(openAuthPopup());
+      toast.info("Please sign in to complete your purchase.");
+      return;
+    }
     navigateTo("/payment");
   };
 
