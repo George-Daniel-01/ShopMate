@@ -45,7 +45,7 @@ const ProductSlider = ({ title, products }: ProductSliderProps) => {
                 {isNewProduct(product) && <span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded">NEW</span>}
                 {product.ratings >= 4.5 && <span className="px-2 py-1 bg-gradient-to-r from-yellow-400 to-rose-500 text-white text-xs font-semibold rounded">TOP RATED</span>}
               </div>
-              <button onClick={(e) => handleAddToCart(product, e)} className="absolute bottom-3 right-3 p-2 glass-card hover:glow-on-hover animate-smooth opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50" disabled={product.stock === 0}>
+              <button onClick={(e) => handleAddToCart(product, e)} className="absolute bottom-3 right-3 p-2 glass-card hover:glow-on-hover animate-smooth opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity disabled:opacity-50" disabled={product.stock === 0}>
                 <ShoppingCart className="w-5 h-5 text-primary" />
               </button>
             </div>

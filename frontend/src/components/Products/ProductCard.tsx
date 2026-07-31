@@ -100,7 +100,7 @@ const ProductCard = ({ product }: { product: import("../../types/index").Product
           className={`absolute top-3 right-3 p-2 rounded-full transition-all duration-300 ${
             isWishlisted
               ? "bg-destructive text-white shadow-[var(--shadow-glow)]"
-              : "bg-white/90 backdrop-blur text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100"
+              : "bg-white/90 backdrop-blur text-muted-foreground hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100"
           }`}
         >
           <Heart className={`w-4 h-4 ${isWishlisted ? "fill-current" : ""}`} />
@@ -110,14 +110,14 @@ const ProductCard = ({ product }: { product: import("../../types/index").Product
         <button
           onClick={handleQuickView}
           title="Quick view"
-          className="absolute bottom-3 left-3 p-2 rounded-full bg-white/90 backdrop-blur text-foreground shadow-[var(--shadow-glow)] opacity-0 group-hover:opacity-100 transition-all duration-300 hover:text-primary"
+          className="absolute bottom-3 left-3 p-2 rounded-full bg-white/90 backdrop-blur text-foreground shadow-[var(--shadow-glow)] opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 hover:text-primary"
         >
           <Eye className="w-4 h-4" />
         </button>
 
         <button
           onClick={handleAddToCart}
-          className="absolute bottom-3 right-3 p-2 rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-glow)] opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          className="absolute bottom-3 right-3 p-2 rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-glow)] opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={product.stock === 0}
           title="Add to cart"
         >

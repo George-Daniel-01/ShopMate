@@ -10,23 +10,27 @@ import { placeOrder } from "../store/slices/orderSlice";
 const Payment = (): React.JSX.Element | null => {
   const { authUser } = useAppSelector((state) => state.auth);
   const navigateTo = useNavigate();
-  if (!authUser) { navigateTo("/products"); return null; }
-
-  const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-  const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
-
   const dispatch = useAppDispatch();
   const { cart } = useAppSelector((state) => state.cart);
   const { orderStep } = useAppSelector((state) => state.order);
   const [shippingDetails, setShippingDetails] = useState({
     fullName: "",
-    state: "Karachi",
+    state: "Lagos",
     phone: "",
     address: "",
-    city: "",
+    city: "Lagos",
     zipCode: "",
-    country: "Pakistan",
+    country: "Nigeria",
   });
+
+  useEffect(() => {
+    if (!authUser) navigateTo("/products");
+  }, [authUser, navigateTo]);
+
+  if (!authUser) return null;
+
+  const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+  const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
 
   const total = cart.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
@@ -202,22 +206,14 @@ const Payment = (): React.JSX.Element | null => {
                           }}
                           className="w-full px-4 py-3 bg-secondary border border-border rounded-lg text-foreground"
                         >
-                          <option value="Karachi">Karachi</option>
-                          <option value="Punjab">Punjab</option>
-                          <option value="Sindh">Sindh</option>
-                          <option value="Balochistan">Balochistan</option>
-                          <option value="Khyber Pakhtunkhwa (KPK)">
-                            Khyber Pakhtunkhwa (KPK)
-                          </option>
-                          <option value="Islamabad Capital Territory">
-                            Islamabad Capital Territory
-                          </option>
-                          <option value="Azad Jammu And Kashmir (AJK)">
-                            Azad Jammu And Kashmir (AJK)
-                          </option>
-                          <option value="Gilgit Baltistan (GB)">
-                            Gilgit Baltistan (GB)
-                          </option>
+                          <option value="Lagos">Lagos</option>
+                          <option value="Abuja">Abuja (FCT)</option>
+                          <option value="Rivers">Rivers</option>
+                          <option value="Kano">Kano</option>
+                          <option value="Oyo">Oyo</option>
+                          <option value="Kaduna">Kaduna</option>
+                          <option value="Delta">Delta</option>
+                          <option value="Anambra">Anambra</option>
                         </select>
                       </div>
                     </div>
@@ -291,7 +287,12 @@ const Payment = (): React.JSX.Element | null => {
                           }}
                           className="w-full px-4 py-3 bg-secondary border border-border rounded-lg text-foreground"
                         >
-                          <option value="Pakistan">Pakistan</option>
+                          <option value="Nigeria">Nigeria</option>
+                          <option value="Ghana">Ghana</option>
+                          <option value="Kenya">Kenya</option>
+                          <option value="South Africa">South Africa</option>
+                          <option value="United States">United States</option>
+                          <option value="United Kingdom">United Kingdom</option>
                         </select>
                       </div>
                     </div>

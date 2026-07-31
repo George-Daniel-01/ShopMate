@@ -92,14 +92,18 @@ const ProductDetail = () => {
           {/* IMAGES */}
           <div>
             <div className="glass-card p-4 mb-4">
-              {product.images ? (
+              {product.images?.length ? (
                 <img
-                  src={product.images[selectedImage]?.url}
+                  src={product.images[selectedImage % product.images.length]?.url}
                   alt={product.name}
                   className="w-full h-96 object-contain rounded-lg"
                 />
               ) : (
-                <div className="glass-card min-h-[418px] p-4 mb-4 animate-pulse" />
+                <img
+                  src="/avatar-holder.avif"
+                  alt={product.name}
+                  className="w-full h-96 object-contain rounded-lg"
+                />
               )}
             </div>
             <div className="flex space-x-2">

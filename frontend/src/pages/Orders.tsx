@@ -60,7 +60,12 @@ const Orders = (): React.JSX.Element | null => {
 
   const { authUser } = useAppSelector((state) => state.auth);
   const navigateTo = useNavigate();
-  if (!authUser) { navigateTo("/products"); return null; }
+
+  useEffect(() => {
+    if (!authUser) navigateTo("/products");
+  }, [authUser, navigateTo]);
+
+  if (!authUser) return null;
 
   return (
     <>

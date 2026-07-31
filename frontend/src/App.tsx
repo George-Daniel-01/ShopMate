@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route } from "react-router-dom";
+﻿import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ToastContainer } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
@@ -33,6 +33,31 @@ import NotFound from "./pages/NotFound";
 import type { RootState } from "./types/index";
 import type { AppDispatch } from "./store/store";
 
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    const titles: Record<string, string> = {
+      "/": "ShopMate | Home",
+      "/products": "ShopMate | Products",
+      "/cart": "ShopMate | Cart",
+      "/wishlist": "ShopMate | Wishlist",
+      "/orders": "ShopMate | My Orders",
+      "/payment": "ShopMate | Checkout",
+      "/about": "ShopMate | About",
+      "/faq": "ShopMate | FAQ",
+      "/contact": "ShopMate | Contact",
+    };
+    const base = Object.keys(titles).find(
+      (p) => p !== "/" && pathname.startsWith(p)
+    );
+    document.title = titles[base || pathname] || "ShopMate";
+  }, [pathname]);
+
+  return null;
+};
+
 const App = () => {
   const { isCheckingAuth } = useSelector((state: RootState) => state.auth);
   const dispatch = useDispatch<AppDispatch>();
@@ -51,6 +76,7 @@ const App = () => {
   return (
     <ThemeProvider>
       <BrowserRouter>
+        <ScrollToTop />
         <div className="min-h-screen bg-background">
           <Navbar />
           <Sidebar />
