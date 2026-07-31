@@ -380,12 +380,13 @@ Output: {"search": null, "category": "Books", "minPrice": null, "maxPrice": 30}`
 
       const keywords = tokenize(p.search);
       if (keywords.length) {
-        const parts = keywords.map(() => `(p.name ILIKE $${index} OR p.description ILIKE $${index + 1})`);
-        conditions.push(`(${parts.join(useOr ? " OR " : " AND ")})`);
-        keywords.forEach((k) => {
+        const parts = keywords.map((k) => {
+          const part = `(p.name ILIKE $${index} OR p.description ILIKE $${index + 1})`;
           values.push(`%${k}%`, `%${k}%`);
           index += 2;
+          return part;
         });
+        conditions.push(`(${parts.join(useOr ? " OR " : " AND ")})`);
       }
       if (p.category) {
         conditions.push(`p.category ILIKE $${index}`);
@@ -423,8 +424,19 @@ Output: {"search": null, "category": "Books", "minPrice": null, "maxPrice": 30}`
     }
     if (searchResult.totalProducts === 0 && !params.category) {
       const detected = detectCategory(params.search) || detectCategory(userPrompt);
-      // Replace (not AND) the search terms: they matched nothing, so only the category matters.
-      if (detected) searchResult = await runSearch({ ...params, search: null, category: detected }, false);
+      if (detected) {
+        // Price bounds are dropped here too: step 2 already proved they caused the 0-result,
+        // and re-applying them could still block e.g. "fashion under $10".
+        const relaxed = { ...params, minPrice: null, maxPrice: null };
+        // Try: original keywords OR-matched together with the detected category
+        // (e.g. "running shoes" -> Fashion -> Running Sneakers only)
+        searchResult = await runSearch({ ...relaxed, category: detected }, true);
+        // If keywords matched nothing in that category, fall back to category alone
+        // (e.g. "expensive electronics" -> all Electronics).
+        if (searchResult.totalProducts === 0) {
+          searchResult = await runSearch({ ...relaxed, search: null, category: detected }, false);
+        }
+      }
     }
     if (searchResult.totalProducts === 0) {
       searchResult = await runSearch({ ...params, minPrice: null, maxPrice: null }, true);
