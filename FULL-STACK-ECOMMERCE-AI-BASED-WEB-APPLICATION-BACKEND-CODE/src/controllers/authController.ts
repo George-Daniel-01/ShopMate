@@ -162,7 +162,7 @@ export const googleAuth = catchAsyncErrors(
 );
 
 export const googleCallback = catchAsyncErrors(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { code, state, error } = req.query as {
       code?: string;
       state?: string;
@@ -181,7 +181,8 @@ export const googleCallback = catchAsyncErrors(
     }
     const stateCookie = req.cookies?.google_oauth_state;
     if (stateCookie && state !== stateCookie) {
-      return next(new ErrorHandler("Invalid OAuth state.", 400));
+      clearStateCookie();
+      return res.redirect(`${frontendUrl}?google=error`);
     }
     if (!code) {
       clearStateCookie();

@@ -165,6 +165,7 @@ export default {
         parameters: [
           { name: "code", in: "query", required: true, schema: { type: "string" } },
           { name: "state", in: "query", required: true, schema: { type: "string" } },
+          { name: "error", in: "query", required: false, schema: { type: "string" }, description: "Present when the user declined (e.g. access_denied)" },
         ],
         responses: {
           "302": { description: "Redirect to the frontend with ?google=success" },
