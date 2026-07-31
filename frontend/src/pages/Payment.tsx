@@ -95,8 +95,8 @@ const Payment = (): React.JSX.Element | null => {
             </div>
 
             {/* PROGRESS STEPS */}
-            <div className="flex items-center justify-center mb-12">
-              <div className="flex items-center space-x-4">
+            <div className="flex items-center justify-center mb-8 sm:mb-12 overflow-x-auto">
+              <div className="flex items-center space-x-2 sm:space-x-4">
                 {/* STEP 1 */}
                 <div
                   className={`flex items-center space-x-2 ${
@@ -112,11 +112,11 @@ const Payment = (): React.JSX.Element | null => {
                   >
                     {orderStep > 1 ? <Check className="w-5 h-5" /> : "1"}
                   </div>
-                  <span className="font-medium">Details</span>
+                  <span className="font-medium text-sm sm:text-base">Details</span>
                 </div>
 
                 <div
-                  className={`w-12 h-0 ${
+                  className={`w-6 sm:w-12 h-0 ${
                     orderStep >= 2 ? "bg-primary" : "bg-border"
                   }`}
                 />
@@ -136,7 +136,7 @@ const Payment = (): React.JSX.Element | null => {
                   >
                     {orderStep > 2 ? <Check className="w-5 h-5" /> : "2"}
                   </div>
-                  <span className="font-medium">Payment</span>
+                  <span className="font-medium text-sm sm:text-base">Payment</span>
                 </div>
               </div>
             </div>

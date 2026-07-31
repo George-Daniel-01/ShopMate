@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { X, Search } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { useNavigate } from "react-router-dom";
@@ -25,7 +25,7 @@ const SearchOverlay = () => {
         <div className="absolute inset-0 backdrop-blur-md bg-[hsla(var(--glass-bg))]">
           {/* SEARCH CONTAINER */}
           <div className="relative z-10 animate-slide-in-top">
-            <div className="glass-panel m-6 max-w-2xl mx-auto">
+            <div className="glass-panel m-3 sm:m-6 max-w-2xl mx-auto">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-primary">
                   Search Products

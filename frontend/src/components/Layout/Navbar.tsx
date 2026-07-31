@@ -1,4 +1,4 @@
-﻿import { Menu, User, ShoppingCart, Sun, Moon, Search, Heart } from "lucide-react";
+import { Menu, User, ShoppingCart, Sun, Moon, Search, Heart } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
@@ -29,7 +29,7 @@ const Navbar = () => {
             {/* LEFT - HAMBURGER MENU */}
             <button
               onClick={() => dispatch(toggleSidebar())}
-              className="p-2 rounded-lg hover:bg-secondary transition-colors"
+              className="p-1.5 sm:p-2 rounded-lg hover:bg-secondary transition-colors"
             >
               <Menu className="w-6 h-6 text-foreground" />
             </button>
@@ -37,16 +37,16 @@ const Navbar = () => {
             {/* CENTER LOGO */}
             <div className="flex-1 flex justify-center">
               <Link to="/">
-                <h1 className="text-2xl font-bold text-primary">ShopMate</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-primary">ShopMate</h1>
               </Link>
             </div>
 
             {/* RIGHT SIDE ICONS */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 sm:space-x-2">
               {/* THEME TOGGLE */}
               <button
                 onClick={toggleTheme}
-                className="p-2 rounded-lg hover:bg-secondary transition-colors"
+                className="p-1.5 sm:p-2 rounded-lg hover:bg-secondary transition-colors"
               >
                 {theme === "dark" ? (
                   <Sun className="w-5 h-5 text-foreground" />
@@ -58,7 +58,7 @@ const Navbar = () => {
               {/* SEARCH OVERLAY */}
               <button
                 onClick={() => dispatch(toggleSearchBar())}
-                className="p-2 rounded-lg hover:bg-secondary transition-colors"
+                className="p-1.5 sm:p-2 rounded-lg hover:bg-secondary transition-colors"
               >
                 <Search className="w-5 h-5 text-foreground" />
               </button>
@@ -66,7 +66,7 @@ const Navbar = () => {
               {/* WISHLIST */}
               <Link
                 to="/wishlist"
-                className="relative p-2 rounded-lg hover:bg-secondary transition-colors"
+                className="relative p-1.5 sm:p-2 rounded-lg hover:bg-secondary transition-colors"
                 title="Wishlist"
               >
                 <Heart className="w-5 h-5 text-foreground" />
@@ -80,7 +80,7 @@ const Navbar = () => {
               {/* USER PROFILE */}
               <button
                 onClick={() => dispatch(toggleAuthPopup())}
-                className="p-2 rounded-lg hover:bg-secondary transition-colors"
+                className="p-1.5 sm:p-2 rounded-lg hover:bg-secondary transition-colors"
               >
                 <User className="w-5 h-5 text-foreground" />
               </button>
@@ -88,7 +88,7 @@ const Navbar = () => {
               {/* CART */}
               <button
                 onClick={() => dispatch(toggleCart())}
-                className="relative p-2 rounded-lg hover:bg-secondary transition-colors"
+                className="relative p-1.5 sm:p-2 rounded-lg hover:bg-secondary transition-colors"
               >
                 <ShoppingCart className="w-5 h-5 text-foreground" />
                 {cartItemsCount > 0 && (

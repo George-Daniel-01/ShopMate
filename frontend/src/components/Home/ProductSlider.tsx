@@ -1,4 +1,4 @@
-﻿import { useRef } from "react";
+import { useRef } from "react";
 import { ChevronLeft, ChevronRight, Star, ShoppingCart } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAppDispatch } from "../../store/hooks";
@@ -38,7 +38,7 @@ const ProductSlider = ({ title, products }: ProductSliderProps) => {
       </div>
       <div ref={scrollRef} className="flex space-x-6 overflow-x-auto scrollbar-hide pb-4">
         {products?.map((product: Product) => (
-          <Link key={product.id} to={`/product/${product.id}`} className="flex-shrink-0 w-80 glass-card hover:glow-on-hover animate-smooth group">
+          <Link key={product.id} to={`/product/${product.id}`} className="flex-shrink-0 w-[70vw] sm:w-80 glass-card hover:glow-on-hover animate-smooth group">
             <div className="relative overflow-hidden rounded-lg mb-4">
               <img src={product.images?.[0]?.url} alt={product.name} className="w-full h-48 object-contain group-hover:scale-110 transition-transform duration-300" />
               <div className="absolute top-3 left-3 flex flex-col space-y-2">

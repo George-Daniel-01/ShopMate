@@ -54,27 +54,27 @@ const HeroSlider = () => {
   const slide = slides[currentSlide];
 
   return (
-    <div className="relative h-[70vh] overflow-hidden rounded-2xl">
+    <div className="relative h-[60vh] sm:h-[70vh] overflow-hidden rounded-2xl">
       {/* Single Active Slide */}
       <div className="relative h-full">
         <div className="absolute inset-0 bg-cover bg-center animate-ken-burns"
           style={{ backgroundImage: `url(${slide.image})` }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
-        <div className="relative h-full flex items-center justify-center text-center px-6">
+        <div className="relative h-full flex items-center justify-center text-center px-4 sm:px-6">
           <div className="max-w-3xl animate-fade-in-up">
-            <h3 className="text-lg font-medium text-white/90 mb-2">
+            <h3 className="text-base sm:text-lg font-medium text-white/90 mb-2">
               {slide.subtitle}
             </h3>
-            <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 drop-shadow-lg">
+            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold text-white mb-4 drop-shadow-lg">
               {slide.title}
             </h1>
-            <p className="text-xl text-white/85 mb-8 max-w-2xl mx-auto">
+            <p className="text-base sm:text-xl text-white/85 mb-6 sm:mb-8 max-w-2xl mx-auto">
               {slide.description}
             </p>
             <Link
               to={slide.url}
-              className="px-8 py-4 bg-white text-gray-900 rounded-lg hover:bg-gray-100 hover:shadow-[var(--shadow-elegant)] animate-smooth font-semibold text-lg"
+              className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-gray-900 rounded-lg hover:bg-gray-100 hover:shadow-[var(--shadow-elegant)] animate-smooth font-semibold text-base sm:text-lg"
             >
               {slide.cta}
             </Link>
@@ -97,7 +97,7 @@ const HeroSlider = () => {
       </button>
 
       {/* Dots */}
-      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex space-x-3">
+      <div className="absolute bottom-4 sm:bottom-6 left-1/2 transform -translate-x-1/2 flex space-x-2 sm:space-x-3">
         {slides.map((_, index) => (
           <button
             key={index}

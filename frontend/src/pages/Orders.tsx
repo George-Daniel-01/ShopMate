@@ -191,12 +191,12 @@ const Orders = (): React.JSX.Element | null => {
                         return (
                           <div
                             key={item.product_id}
-                            className="flex items-center space-x-4 p-4 bg-secondary/50 rounded-lg"
+                            className="flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 bg-secondary/50 rounded-lg"
                           >
                             <img
                               src={item.image}
                               alt={item.title}
-                              className="w-16 h-16 object-cover rounded-lg"
+                              className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-lg shrink-0"
                             />
                             <div className="flex-1 min-w-0">
                               <h4 className="font-medium text-foreground truncate">

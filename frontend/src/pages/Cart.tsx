@@ -1,4 +1,4 @@
-﻿import { Plus, Minus, Trash2, ArrowRight } from "lucide-react";
+import { Plus, Minus, Trash2, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { removeFromCart, updateCartQuantity } from "../store/slices/cartSlice";
@@ -102,7 +102,7 @@ const Cart = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-4">
+                      <div className="flex items-center justify-between md:justify-start md:space-x-4 w-full md:w-auto">
                         <div className="flex items-center space-x-2">
                           <button
                             disabled={item.quantity === 1}

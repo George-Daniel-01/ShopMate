@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Star,
@@ -78,7 +78,7 @@ const ProductDetail = () => {
     <div className="min-h-screen pt-20">
       <div className="container mx-auto px-4 py-8">
         {/* BREADCRUMB */}
-        <nav className="text-sm text-muted-foreground mb-6 flex items-center gap-2">
+        <nav className="text-sm text-muted-foreground mb-6 flex flex-wrap items-center gap-1 sm:gap-2">
           <Link to="/" className="hover:text-primary transition-colors">Home</Link>
           <span>/</span>
           <Link to="/products" className="hover:text-primary transition-colors">Products</Link>
@@ -96,17 +96,17 @@ const ProductDetail = () => {
                 <img
                   src={product.images[selectedImage % product.images.length]?.url}
                   alt={product.name}
-                  className="w-full h-96 object-contain rounded-lg"
+                  className="w-full h-56 sm:h-80 lg:h-96 object-contain rounded-lg"
                 />
               ) : (
                 <img
                   src="/avatar-holder.avif"
                   alt={product.name}
-                  className="w-full h-96 object-contain rounded-lg"
+                  className="w-full h-56 sm:h-80 lg:h-96 object-contain rounded-lg"
                 />
               )}
             </div>
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
               {product.images?.map((image, index) => (
                 <button
                   key={index}
@@ -132,7 +132,7 @@ const ProductDetail = () => {
               )}
             </div>
 
-            <h1 className="text-3xl font-bold text-foreground mb-2">{product.name}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">{product.name}</h1>
 
             <div className="flex items-center space-x-4 mb-4">
               <div className="flex items-center space-x-1">

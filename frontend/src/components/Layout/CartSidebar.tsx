@@ -40,7 +40,7 @@ const CartSidebar = () => {
         className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
         onClick={() => dispatch(toggleCart())}
       />
-      <div className="fixed right-0 top-0 h-full w-96 z-50 glass-panel animate-slide-in-right overflow-y-auto">
+      <div className="fixed right-0 top-0 h-full w-full sm:w-96 max-w-[95vw] z-50 glass-panel animate-slide-in-right overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-[hsla(var(--glass-border))]">
           <div>
             <h2 className="text-xl font-semibold text-primary">Shopping Cart</h2>
