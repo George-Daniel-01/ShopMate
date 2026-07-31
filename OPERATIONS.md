@@ -79,7 +79,8 @@ Most outages are the database. The API has a built-in self-healing
 | Cloudinary (images) | same email | `CLOUDINARY_*` in Vercel backend env |
 | Stripe (payments) | same email | `STRIPE_*` in Vercel backend env |
 | SMTP (emails) | same email | `SMTP_*` in Vercel backend env |
-| OpenRouter (AI search) | same email | `OPENROUTER_API_KEY` in Vercel backend env |
+| NVIDIA NIM (AI search, primary) | `mykey.py` in D:\code\GenericAgent | `NVIDIA_API_KEY` in Vercel backend env |
+| OpenRouter (AI search, fallback) | same email | `OPENROUTER_API_KEY` in Vercel backend env |
 
 **Rule: env vars live ONLY in the Vercel dashboard** (project → Settings → Environment Variables).
 They are NOT in the repo. The one exception is the backup URL stored as a GitHub
@@ -196,8 +197,9 @@ Typecheck everything: `npm run build` in each folder (CI does the same).
 
 ## 10. Known gaps / to-do
 
-- `OPENROUTER_API_KEY` in Vercel is a 2-char placeholder — the AI product
-  search feature is currently off. Add a real key if you want it back.
+- `NVIDIA_API_KEY` in Vercel is a 2-char placeholder — the AI product
+  search feature is currently off. Add the real NVIDIA NIM key (same key as
+  GenericAgent's `mykey.py`) to turn it on; OpenRouter fallback works too.
 - The Neon free tier caps storage; the `shopmate` DB should stay tiny. Check
   occasionally at console.neon.tech.
 - The old production database (the one with the cal.diy schema) still contains

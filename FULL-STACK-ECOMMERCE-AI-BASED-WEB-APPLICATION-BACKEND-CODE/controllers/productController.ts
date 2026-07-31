@@ -235,8 +235,9 @@ export const aiSearchProducts = catchAsyncErrors(
     const { userPrompt } = req.body as { userPrompt: string };
     if (!userPrompt) return next(new ErrorHandler("Please provide a search prompt.", 400));
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) return next(new ErrorHandler("AI search is not configured.", 503));
+    const nvidiaKey = process.env.NVIDIA_API_KEY;
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    if (!nvidiaKey && !openRouterKey) return next(new ErrorHandler("AI search is not configured.", 503));
 
     const systemPrompt = `You are a product search assistant for an e-commerce store. Extract structured search parameters from the user's natural language query.
 Return ONLY a valid JSON object (no markdown, no backticks, no extra text) with these optional fields:
@@ -259,14 +260,17 @@ Output: {"search": "sneakers", "category": null, "minPrice": null, "maxPrice": n
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const provider = nvidiaKey
+        ? { base: "https://integrate.api.nvidia.com/v1", key: nvidiaKey, model: "nvidia/nemotron-3-ultra-550b-a55b" }
+        : { base: "https://openrouter.ai/api/v1", key: openRouterKey, model: "openai/gpt-4o-mini" };
+      const response = await fetch(`${provider.base}/chat/completions`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "Authorization": `Bearer ${provider.key}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "openai/gpt-4o-mini",
+          model: provider.model,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
@@ -277,7 +281,7 @@ Output: {"search": "sneakers", "category": null, "minPrice": null, "maxPrice": n
       clearTimeout(timeout);
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`OpenRouter API error: ${errorText}`);
+        throw new Error(`${provider.base} API error: ${errorText}`);
       }
       const data: any = await response.json();
       const rawContent = data.choices[0].message.content;

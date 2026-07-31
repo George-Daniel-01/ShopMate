@@ -10,8 +10,11 @@ const requiredEnvVars = [
   "CLOUDINARY_CLIENT_NAME", "CLOUDINARY_CLIENT_API", "CLOUDINARY_CLIENT_SECRET",
   "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET",
   "SMTP_HOST", "SMTP_MAIL", "SMTP_PASSWORD",
-  "OPENROUTER_API_KEY",
 ];
+if (!process.env.NVIDIA_API_KEY && !process.env.OPENROUTER_API_KEY) {
+  console.error("Missing required environment variable: NVIDIA_API_KEY (or OPENROUTER_API_KEY)");
+  if (process.env.VERCEL !== "1") process.exit(1);
+}
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
     console.error(`Missing required environment variable: ${envVar}`);

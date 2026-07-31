@@ -52,7 +52,7 @@ ShopMate/
 - Cloudinary integration for image storage (products, categories, avatars)
 - Stripe payment intents and webhook handling
 - Password reset via email (Nodemailer)
-- AI product search endpoint (OpenRouter / GPT-4o-mini)
+- AI product search endpoint (NVIDIA NIM Nemotron via OpenRouter-compatible API, OpenRouter GPT-4o-mini fallback)
 - Health check endpoint with automatic table creation and schema diagnostics
 
 ---
@@ -67,7 +67,7 @@ ShopMate/
 | Authentication | JWT, bcrypt, HTTP-only cookies |
 | Payments | Stripe (Payment Intents + Webhooks) |
 | Image Storage | Cloudinary |
-| AI Search | OpenRouter (GPT-4o-mini) |
+| AI Search | NVIDIA NIM (Nemotron 3 Ultra 550B) with OpenRouter (GPT-4o-mini) fallback |
 | Email | Nodemailer (SMTP) |
 | Deployment | Vercel (frontend + backend) |
 
@@ -107,6 +107,7 @@ CLOUDINARY_CLIENT_SECRET=your_api_secret
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
+NVIDIA_API_KEY=your_nvidia_nim_api_key
 OPENROUTER_API_KEY=your_openrouter_api_key
 
 SMTP_HOST=smtp.gmail.com
@@ -300,7 +301,7 @@ https://your-backend.vercel.app/api/v1/payment/webhook
 - **Currency**: Prices are stored internally as numeric values. It is up to the frontend to display the appropriate currency symbol.
 - **Reviews**: Users can only review products from orders with status `Delivered`.
 - **Stock**: Automatically decremented when a Stripe `payment_intent.succeeded` webhook is received. Products can be created/updated with `stock: 0` (out of stock).
-- **AI Search**: Extracts search parameters from natural language via OpenRouter (GPT-4o-mini), then filters the database with the structured query.
+- **AI Search**: Extracts search parameters from natural language via the same NVIDIA NIM API used by the GenericAgent stack (Nemotron 3 Ultra 550B), with OpenRouter GPT-4o-mini as automatic fallback, then filters the database with the structured query.
 - **Image uploads**: Handled via `express-fileupload` with temp files; uploaded directly to Cloudinary. Product and category endpoints also accept plain image URLs (`imageUrls` / `imageUrl`) for quick seeding.
 - **Categories**: Products reference categories by name (string column); the dashboard dropdown and storefront grid are populated from the categories API.
 
