@@ -37,7 +37,7 @@ export const createProduct = catchAsyncErrors(
       name: string; description: string; price: string; category: string; stock: string;
     };
     const created_by = req.user.id;
-    if (!name || !description || !price || !category || !stock)
+    if (!name || !description || !price || !category || stock === undefined || stock === null || stock === "")
       return next(new ErrorHandler("Please provide complete product details.", 400));
 
     const uploadedImages: IProductImage[] = [];
@@ -155,7 +155,7 @@ export const updateProduct = catchAsyncErrors(
     if (description) updates.description = description;
     if (price !== null && !isNaN(price)) updates.price = price;
     if (category) updates.category = category;
-    if (stock && !isNaN(stock)) updates.stock = stock;
+    if (stock !== null && !isNaN(stock)) updates.stock = stock;
 
     let uploadedImages: IProductImage[] = existingProduct.images ?? [];
     if (hasFiles) {
