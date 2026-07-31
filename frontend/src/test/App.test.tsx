@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
-import CategoryGrid from "../components/Home/CategoryGrid";
+import CategoryGrid from "../features/home/components/CategoryGrid";
 
 describe("CategoryGrid", () => {
   it("renders the shop by category heading", () => {

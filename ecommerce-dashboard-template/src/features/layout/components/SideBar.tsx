@@ -1,0 +1,57 @@
+import { useState } from "react";
+import { LayoutDashboard, ListOrdered, Package, Tags, Users, User, LogOut, MoveLeft } from "lucide-react";
+import { Navigate } from "react-router-dom";
+import { logout } from "../../auth/authSlice";
+import { toggleComponent, toggleNavbar } from "../../../app/extraSlice";
+import { useAppDispatch, useAppSelector } from "../../../app/hooks";
+
+const SideBar = () => {
+  const [activeLink, setActiveLink] = useState(0);
+  const links = [
+    { item: <LayoutDashboard />, title: "Dashboard" },
+    { item: <ListOrdered />, title: "Orders" },
+    { item: <Package />, title: "Products" },
+    { item: <Tags />, title: "Categories" },
+    { item: <Users />, title: "Users" },
+    { item: <User />, title: "Profile" },
+  ];
+
+  const isNavbarOpened = useAppSelector((state) => state.extra.isNavbarOpened);
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const dispatch = useAppDispatch();
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+
+  return (
+    <>
+      {isNavbarOpened && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => dispatch(toggleNavbar())}
+        />
+      )}
+      <aside className={`${isNavbarOpened ? "left-[10px]" : "-left-full"} fixed w-64 max-w-[85vw] h-[97.5%] rounded-lg bg-white border border-gray-200 z-40 mt-[10px] transition-all duration-300 shadow-sm p-4 space-y-4 flex flex-col justify-between md:left-[10px]`}>
+      <nav className="space-y-2">
+        <div className="flex flex-col gap-2 py-2">
+          <h2 className="flex items-center justify-between text-xl font-bold text-gray-900">
+            <span>Admin Panel</span>
+            <MoveLeft className="block md:hidden" onClick={() => dispatch(toggleNavbar())} />
+          </h2>
+          <hr className="border-gray-200" />
+        </div>
+        {links.map((item, index) => (
+          <button key={index} onClick={() => { setActiveLink(index); dispatch(toggleComponent(item.title)); }}
+            className={`${activeLink === index ? "bg-[#111827] text-white" : "text-gray-700 hover:bg-gray-100"} w-full transition-all duration-300 rounded-md cursor-pointer px-3 py-2 flex items-center gap-2`}>
+            {item.item} {item.title}
+          </button>
+        ))}
+      </nav>
+      <button onClick={() => dispatch(logout())} className="text-white rounded-md cursor-pointer flex items-center px-3 py-2 gap-2 bg-red-500 hover:bg-red-600">
+        <LogOut /> Logout
+      </button>
+    </aside>
+    </>
+  );
+};
+
+export default SideBar;

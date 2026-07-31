@@ -1,12 +1,39 @@
-# React + Vite
+# ShopMate Storefront
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern e-commerce storefront built with **React 19**, **TypeScript**, **Redux Toolkit**, **Tailwind CSS** and **Vite**.
 
-Currently, two official plugins are available:
+## Architecture
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```
+src/
+├── app/               # App shell: Redux store, hooks, router, providers, error boundary
+├── components/ui/     # Reusable UI primitives (Button, Input, Modal, Spinner)
+├── config/            # Centralized, typed application configuration
+├── features/          # Feature-first modules (auth, cart, checkout, products, ...)
+│   └── <feature>/
+│       ├── components/       # Feature-specific components
+│       ├── pages/            # Route-level pages
+│       └── <feature>Slice.ts # Feature Redux slice
+├── hooks/             # Shared custom hooks
+├── lib/               # Infrastructure (API client, utilities)
+├── types/             # Shared TypeScript types
+└── test/              # Unit tests
+```
 
-## Expanding the ESLint configuration
+## Highlights
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- **Feature-first modules** — every domain owns its components, pages and state
+- **Shared UI kit** (`components/ui`) — consistent, accessible primitives
+- **Route-level code splitting** — lazy-loaded pages with Suspense
+- **Error boundary** — graceful crash recovery instead of a blank page
+- **Path aliases** (`@/`) — clean, collision-free imports
+- **Centralized config** — no hardcoded API URLs or business rules
+
+## Scripts
+
+| Script | Description |
+| --- | --- |
+| `npm run dev` | Start the dev server |
+| `npm run build` | Production build |
+| `npm run lint` | Lint with ESLint |
+| `npm run test` | Run unit tests (Vitest) |

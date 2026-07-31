@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { configureStore } from "@reduxjs/toolkit";
-import authReducer from "../store/slices/authSlice";
-import cartReducer from "../store/slices/cartSlice";
-import productReducer from "../store/slices/productSlice";
+import authReducer from "../features/auth/authSlice";
+import cartReducer from "../features/cart/cartSlice";
+import productReducer from "../features/products/productSlice";
 
 describe("Redux Store", () => {
   it("creates store with auth reducer", () => {
