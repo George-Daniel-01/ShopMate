@@ -12,6 +12,7 @@ import productRouter from "./router/productRoutes.js";
 import adminRouter from "./router/adminRoutes.js";
 import orderRouter from "./router/orderRoutes.js";
 import { database } from "./database/db.js";
+import { healthCheck } from "./controllers/healthController.js";
 
 config({ path: "./config/config.env" });
 
@@ -133,6 +134,8 @@ app.use(express.urlencoded({ extended: true }));
 
 
 app.use(fileUpload({ useTempFiles: true, tempFileDir: "/tmp/", limits: { fileSize: 10 * 1024 * 1024 }, abortOnLimit: true }));
+
+app.get("/api/v1/health", healthCheck);
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/product", productRouter);
