@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Star,
@@ -17,14 +17,23 @@ import ReviewsContainer from "../components/ReviewsContainer";
 import ProductCard from "../components/ProductCard";
 import { addToCart } from "../../cart/cartSlice";
 import { toggleWishlist } from "../../wishlist/wishlistSlice";
-import { fetchProductDetails, resetProductDetails } from "../productSlice";
+import { useGetProductDetailsQuery, useGetProductsQuery } from "../../../app/apiSlice";
 
 const ProductDetail = () => {
   const { id } = useParams();
   const dispatch = useAppDispatch();
   const navigateTo = useNavigate();
-  const product = useAppSelector((state) => state.product?.productDetails);
-  const { loading, productReviews, products } = useAppSelector((state) => state.product);
+  const { data: product, isLoading } = useGetProductDetailsQuery(id!);
+  const { data: productsData } = useGetProductsQuery({
+    category: "",
+    price: "0-10000",
+    search: "",
+    ratings: 0,
+    availability: "",
+    page: 1,
+  });
+  const products = productsData?.products ?? [];
+  const productReviews = product?.reviews ?? [];
   const { wishlist } = useAppSelector((state) => state.wishlist);
   const { authUser } = useAppSelector((state) => state.auth);
   const [selectedImage, setSelectedImage] = useState(0);
@@ -54,13 +63,9 @@ const ProductDetail = () => {
     navigateTo("/payment");
   };
 
-  useEffect(() => {
-    dispatch(resetProductDetails());
-    dispatch(fetchProductDetails(id!));
-  }, [dispatch, id]);
 
   // âœ… loading BEFORE !product â€” spinner shows while API is in flight
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader className="size-10 animate-spin" />

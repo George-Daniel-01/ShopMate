@@ -29,6 +29,6 @@ describe("Redux Store", () => {
     });
     const state = store.getState();
     expect(state.product).toBeDefined();
-    expect(state.product).toHaveProperty("products");
+    expect(state.product).toHaveProperty("isAISearchResult");
   });
 });

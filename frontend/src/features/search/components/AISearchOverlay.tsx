@@ -3,16 +3,17 @@ import { Sparkles, X, Loader, Send, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../../app/hooks";
 import { toggleAIModal } from "../../../app/popupSlice";
-import { fetchProductWithAI } from "../../products/productSlice";
+import { setAISearchPending, setAISearchResults } from "../../products/productSlice";
+import { useAiSearchMutation } from "../../../app/apiSlice";
 
 const AISearchOverlay = () => {
   const [prompt, setPrompt] = useState("");
   const [searchSubmitted, setSearchSubmitted] = useState(false);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { isAIPopupOpen, aiSearching, isAISearchResult } = useAppSelector((state) => ({
+  const [aiSearch, { isLoading: aiSearching }] = useAiSearchMutation();
+  const { isAIPopupOpen, isAISearchResult } = useAppSelector((state) => ({
     isAIPopupOpen: state.popup.isAIPopupOpen,
-    aiSearching: state.product.aiSearching,
     isAISearchResult: state.product.isAISearchResult,
   }));
 
@@ -31,7 +32,13 @@ const AISearchOverlay = () => {
   const handleSearch = () => {
     if (prompt.trim() !== "") {
       setSearchSubmitted(true);
-      dispatch(fetchProductWithAI(prompt));
+      dispatch(setAISearchPending());
+      aiSearch(prompt)
+        .unwrap()
+        .then((res) => dispatch(setAISearchResults(res)))
+        .catch(() => {
+          // Errors are toasted by the apiSlice endpoint.
+        });
     }
   };
 

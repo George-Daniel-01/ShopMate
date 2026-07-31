@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from "../../../app/hooks";
 import { addToCart } from "../../cart/cartSlice";
 import { toggleWishlist } from "../../wishlist/wishlistSlice";
 import { openQuickView } from "../../../app/popupSlice";
+import Badge from "@/components/ui/Badge";
 
 const FALLBACK_IMAGE = "/avatar-holder.avif";
 
@@ -81,14 +82,10 @@ const ProductCard = ({ product }: { product: import("../../../types/index").Prod
 
         <div className="absolute top-3 left-3 flex flex-col space-y-2">
           {isNewProduct() && (
-            <span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded">
-              NEW
-            </span>
+            <Badge>NEW</Badge>
           )}
           {isTopRated() && (
-            <span className="px-2 py-1 bg-gradient-to-r from-yellow-400 to-rose-500 text-white text-xs font-semibold rounded">
-              TOP RATED
-            </span>
+            <Badge variant="gold">TOP RATED</Badge>
           )}
         </div>
 
@@ -149,21 +146,21 @@ const ProductCard = ({ product }: { product: import("../../../types/index").Prod
 
         <div className="flex items-center justify-between mt-auto">
           <span className="text-xl font-bold text-primary">${product.price}</span>
-          <span
-            className={`text-xs px-2 py-1 rounded ${
+          <Badge
+            variant={
               product.stock > 5
-                ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                ? "success"
                 : product.stock > 0
-                ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
-                : "bg-red-500/10 text-red-600 dark:text-red-400"
-            }`}
+                ? "warning"
+                : "danger"
+            }
           >
             {product.stock > 5
               ? "In Stock"
               : product.stock > 0
               ? "Low Stock"
               : "Sold Out"}
-          </span>
+          </Badge>
         </div>
       </div>
     </Link>

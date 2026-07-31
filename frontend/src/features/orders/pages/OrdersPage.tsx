@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Filter, Package, Truck, CheckCircle, XCircle } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../../app/hooks";
 import { Link, useNavigate } from "react-router-dom";
-import { fetchMyOrders, cancelOrder } from "../orderSlice";
+import { useGetMyOrdersQuery, useCancelOrderMutation } from "../../../app/apiSlice";
 import { addToCart } from "../../cart/cartSlice";
 import { openAuthPopup } from "../../../app/popupSlice";
 import { toast } from "react-toastify";
@@ -10,26 +10,16 @@ import { toast } from "react-toastify";
 const Orders = (): React.JSX.Element | null => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const { myOrders } = useAppSelector((state) => state.order);
   const { authUser } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
   const navigateTo = useNavigate();
+  const { data: myOrders = [] } = useGetMyOrdersQuery(undefined, {
+    skip: !authUser,
+    pollingInterval: 30000,
+  });
+  const [cancelOrder] = useCancelOrderMutation();
 
-  useEffect(() => {
-    // Only fetch orders while signed in
-    if (!authUser) return;
 
-    // Fetch immediately on mount
-    dispatch(fetchMyOrders());
-
-    // âœ… FIX: Auto-refresh every 30 seconds so admin status changes reflect here
-    const interval = setInterval(() => {
-      dispatch(fetchMyOrders());
-    }, 30000);
-
-    // Cleanup interval when user leaves the page
-    return () => clearInterval(interval);
-  }, [dispatch, authUser]);
 
   const handleReorder = (order: import("../../../types/index").Order) => {
     order?.order_items?.forEach((item) => {
@@ -54,7 +44,7 @@ const Orders = (): React.JSX.Element | null => {
   };
 
   const handleCancelOrder = (orderId: string) => {
-    dispatch(cancelOrder(orderId));
+    cancelOrder(orderId);
   };
 
   const filterOrders = myOrders.filter(

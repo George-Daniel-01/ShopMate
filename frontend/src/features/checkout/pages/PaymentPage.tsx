@@ -6,12 +6,13 @@ import { useAppDispatch, useAppSelector } from "../../../app/hooks";
 import { Elements } from "@stripe/react-stripe-js";
 import PaymentForm from "../components/PaymentForm";
 import { loadStripe } from "@stripe/stripe-js";
-import { placeOrder } from "../../orders/orderSlice";
+import { usePlaceOrderMutation } from "../../../app/apiSlice";
 import { openAuthPopup } from "../../../app/popupSlice";
 
 const Payment = (): React.JSX.Element | null => {
   const { authUser } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
+  const [placeOrder] = usePlaceOrderMutation();
   const { cart } = useAppSelector((state) => state.cart);
   const { orderStep } = useAppSelector((state) => state.order);
   const [shippingDetails, setShippingDetails] = useState({
@@ -78,7 +79,7 @@ const Payment = (): React.JSX.Element | null => {
     formData.append("phone", shippingDetails.phone);
     formData.append("orderedItems", JSON.stringify(cart));
 
-    dispatch(placeOrder(formData));
+    placeOrder(formData);
   };
 
   if (cart.length === 0) {

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import HeroSlider from "../components/HeroSlider";
 import CategoryGrid from "../components/CategoryGrid";
 import ProductSlider from "../components/ProductSlider";
@@ -6,28 +6,22 @@ import FeatureSection from "../components/FeatureSection";
 import TestimonialsSection from "../components/TestimonialsSection";
 import StatsBar from "../components/StatsBar";
 import NewsletterSection from "../components/NewsletterSection";
-import { fetchAllProducts } from "../../products/productSlice";
-import { useAppSelector, useAppDispatch } from "../../../app/hooks";
+import { useGetProductsQuery } from "../../../app/apiSlice";
 
 
 const Index = () => {
-  const dispatch = useAppDispatch();
-  const { products, topRatedProducts, newProducts } = useAppSelector(
-    (state) => state.product
-  );
+  const { data } = useGetProductsQuery({
+    category: "",
+    price: "0-10000",
+    search: "",
+    ratings: 0,
+    availability: "",
+    page: 1,
+  });
 
-  useEffect(() => {
-    dispatch(
-      fetchAllProducts({
-        category: "",
-        price: "0-10000",
-        search: "",
-        ratings: 0,
-        availability: "",
-        page: 1,
-      })
-    );
-  }, [dispatch]);
+  const products = data?.products ?? [];
+  const newProducts = data?.newProducts ?? [];
+  const topRatedProducts = data?.topRatedProducts ?? [];
 
   return (
     <div className="min-h-screen">

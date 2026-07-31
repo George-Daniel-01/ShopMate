@@ -1,4 +1,4 @@
-import { X, Plus, Minus, Trash2, Truck } from "lucide-react";
+import { X, Plus, Minus, Trash2, Truck, ShoppingBag } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../../app/hooks";
 import {
@@ -6,8 +6,8 @@ import {
   updateCartQuantity,
 } from "../cartSlice";
 import { toggleCart } from "../../../app/popupSlice";
-
-const FREE_SHIPPING_THRESHOLD = 50;
+import { FREE_SHIPPING_THRESHOLD } from "@/config";
+import EmptyState from "@/components/ui/EmptyState";
 
 const CartSidebar = () => {
   const dispatch = useAppDispatch();
@@ -56,16 +56,20 @@ const CartSidebar = () => {
 
         <div className="p-6">
           {!cart || cart.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">Your cart is empty.</p>
-              <Link
-                to="/products"
-                onClick={() => dispatch(toggleCart())}
-                className="inline-block mt-4 px-6 py-2 gradient-primary text-primary-foreground rounded-lg hover:glow-on-hover animate-smooth"
-              >
-                Browse Products
-              </Link>
-            </div>
+            <EmptyState
+              icon={<ShoppingBag className="w-16 h-16" />}
+              title="Your cart is empty"
+              description="Browse our products and add something you love."
+              action={
+                <Link
+                  to="/products"
+                  onClick={() => dispatch(toggleCart())}
+                  className="inline-block px-6 py-2 gradient-primary text-primary-foreground rounded-lg hover:glow-on-hover animate-smooth"
+                >
+                  Browse Products
+                </Link>
+              }
+            />
           ) : (
             <>
               {/* FREE SHIPPING PROGRESS */}

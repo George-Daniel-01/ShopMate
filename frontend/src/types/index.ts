@@ -108,23 +108,12 @@ export interface PopupState {
 }
 
 export interface ProductState {
-  products: Product[];
-  newProducts: Product[];
-  topRatedProducts: Product[];
-  productDetails: Product | null;
-  productReviews: Review[];
-  totalProducts: number;
-  loading: boolean;
-  isPostingReview: boolean;
-  isReviewDeleting: boolean;
-  aiSearching: boolean;
   isAISearchResult: boolean;
+  aiProducts: Product[];
+  aiTotalProducts: number;
 }
 
 export interface OrderState {
-  myOrders: Order[];
-  fetchingOrders: boolean;
-  placingOrder: boolean;
   finalPrice: number | null;
   orderStep: number;
   paymentIntent: string | null;

@@ -20,7 +20,6 @@ import RegisterModal from "@/features/auth/components/RegisterModal";
 import ForgotPasswordModal from "@/features/auth/components/ForgotPasswordModal";
 import ResetPasswordModal from "@/features/auth/components/ResetPasswordModal";
 import { getUser } from "@/features/auth/authSlice";
-import { fetchAllProducts } from "@/features/products/productSlice";
 import type { RootState } from "@/types";
 import type { AppDispatch } from "./store";
 
@@ -48,7 +47,6 @@ const App = () => {
   const dispatch = useDispatch<AppDispatch>();
 
   useEffect(() => { dispatch(getUser()); }, [dispatch]);
-  useEffect(() => { dispatch(fetchAllProducts({})); }, [dispatch]);
 
   if (isCheckingAuth) {
     return (

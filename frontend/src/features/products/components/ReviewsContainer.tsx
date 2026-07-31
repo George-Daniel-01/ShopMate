@@ -1,14 +1,13 @@
 import React, { useState } from "react";
-import { useAppDispatch, useAppSelector } from "../../../app/hooks";
-import { postReview, deleteReview } from "../productSlice";
+import { useAppSelector } from "../../../app/hooks";
+import { usePostReviewMutation, useDeleteReviewMutation } from "../../../app/apiSlice";
 import { Star } from "lucide-react";
 
 const ReviewsContainer = ({ product, productReviews }: { product: import("../../../types/index").Product; productReviews: import("../../../types/index").Review[] }) => {
   const { authUser } = useAppSelector((state) => state.auth);
-  const { isReviewDeleting, isPostingReview } = useAppSelector(
-    (state) => state.product
-  );
-  const dispatch = useAppDispatch();
+  const [postReview, { isLoading: isPostingReview }] = usePostReviewMutation();
+  const [deleteReview, { isLoading: isReviewDeleting }] =
+    useDeleteReviewMutation();
 
   const [rating, setRating] = useState(1);
   const [comment, setComment] = useState("");
@@ -19,7 +18,7 @@ const ReviewsContainer = ({ product, productReviews }: { product: import("../../
     const data = new FormData();
     data.append("rating", String(rating));
     data.append("comment", comment);
-    dispatch(postReview({ productId: product.id, review: data }));
+    postReview({ productId: product.id, review: data });
     setRating(1);
     setComment("");
   };
@@ -106,12 +105,10 @@ const ReviewsContainer = ({ product, productReviews }: { product: import("../../
                   {authUser?.id === review.reviewer?.id && (
                     <button
                       onClick={() =>
-                        dispatch(
-                          deleteReview({
-                            productId: product.id,
-                            reviewId: review.review_id,
-                          })
-                        )
+                        deleteReview({
+                          productId: product.id,
+                          reviewId: review.review_id,
+                        })
                       }
                       className="my-6 w-fit flex items-center space-x-3 p-3 rounded-lg glass-card hover:glow-on-hover text-destructive hover:text-destructive-foreground group"
                     >

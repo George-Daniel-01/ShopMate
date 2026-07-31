@@ -5,11 +5,14 @@ import Pagination from "../components/Pagination";
 import { useAppDispatch, useAppSelector } from "../../../app/hooks";
 import { useLocation } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
-import { fetchAllProducts, clearAISearchResult } from "../productSlice";
+import { clearAISearchResult } from "../productSlice";
 import { toggleAIModal } from "../../../app/popupSlice";
+import { useGetProductsQuery } from "../../../app/apiSlice";
 
 const Products = () => {
-  const { products, totalProducts, loading, isAISearchResult } = useAppSelector((state) => state.product);
+  const { isAISearchResult, aiProducts, aiTotalProducts } = useAppSelector(
+    (state) => state.product
+  );
 
   const useQuery = () => {
     return new URLSearchParams(useLocation().search);
@@ -50,19 +53,22 @@ const Products = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  useEffect(() => {
-    if (isAISearchResult) return;
-    dispatch(
-      fetchAllProducts({
-        category: selectedCategory,
-        price: `${priceRange[0]}-${priceRange[1]}`,
-        search: debouncedSearch,
-        ratings: selectedRating,
-        availability: availability,
-        page: currentPage,
-      })
-    );
-  }, [dispatch, selectedCategory, priceRange[1], debouncedSearch, selectedRating, availability, currentPage, isAISearchResult]);
+  const { data, isFetching } = useGetProductsQuery(
+    {
+      category: selectedCategory,
+      price: `${priceRange[0]}-${priceRange[1]}`,
+      search: debouncedSearch,
+      ratings: selectedRating,
+      availability: availability,
+      page: currentPage,
+    },
+    { skip: isAISearchResult }
+  );
+
+  const products = isAISearchResult ? aiProducts : (data?.products ?? []);
+  const totalProducts = isAISearchResult
+    ? aiTotalProducts
+    : (data?.totalProducts ?? 0);
 
   useEffect(() => {
     if (isAISearchResult && !location.state?.fromAISearch) {
@@ -222,7 +228,7 @@ const Products = () => {
               </div>
 
               {/* LOADING / PRODUCTS */}
-              {loading ? (
+              {isFetching ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                   {[...Array(6)].map((_, i) => (
                     <div key={i} className="glass-card animate-pulse">
